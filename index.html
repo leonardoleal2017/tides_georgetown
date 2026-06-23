@@ -192,6 +192,22 @@ function App() {
     };
     const rec = month.days.find((r) => r.d === day) || month.days[0];
     const cls = tideClass(rec.range);
+    // ── Query module state ──────────────────────────────────────
+    const [qLevel, setQLevel] = useState(2.2); // threshold in metres
+    const [qTide, setQTide] = useState("high"); // "high" | "low"
+    const [qScope, setQScope] = useState("all"); // "month" | "all"
+    const query = useMemo(() => {
+        const source = qScope === "all" ? MONTHS : [month];
+        const all = source.flatMap((m) => m.days.map((r) => (Object.assign(Object.assign({}, r), { mName: m.name }))));
+        const val = (r) => (qTide === "high" ? r.highH : r.lowH);
+        const total = all.length;
+        // high tide -> days at/above level; low tide -> days at/below level
+        const match = qTide === "high"
+            ? all.filter((r) => val(r) >= qLevel)
+            : all.filter((r) => val(r) <= qLevel);
+        const pct = total ? (match.length / total) * 100 : 0;
+        return { total, count: match.length, pct, match };
+    }, [qLevel, qTide, qScope, mi]);
     // monthly statistics
     const stats = useMemo(() => {
         const ranges = month.days.map((r) => r.range);
@@ -311,6 +327,66 @@ function App() {
                     React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, "Full month \u00B7 high & low tide day by day"),
                     React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "The band widens at spring tides and narrows at neaps")),
                 React.createElement(TideRibbon, { month: month, selectedDay: day, onPick: setDay })),
+            React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 18, marginTop: 16 }) },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 } },
+                    React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, "Tide level query"),
+                    React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "How many days reach a given tide?")),
+                React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1.1fr) minmax(0,1fr)", gap: 18, alignItems: "center" }, className: "grid-main" },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, [["high", "High tide ≥"], ["low", "Low tide ≤"]].map(([k, lbl]) => (React.createElement("button", { key: k, onClick: () => setQTide(k), style: segBtn(qTide === k, k === "high" ? C.high : C.low) }, lbl)))),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 6 } },
+                            React.createElement("input", { type: "number", step: "0.1", min: "0", max: "3.4", value: qLevel, onChange: (e) => setQLevel(Math.max(0, Math.min(3.4, +e.target.value || 0))), style: {
+                                    width: 92, fontSize: 24, fontWeight: 700, textAlign: "center",
+                                    background: C.abyss, color: C.ink, border: `1px solid ${C.edge}`,
+                                    borderRadius: 10, padding: "8px 6px", fontVariantNumeric: "tabular-nums",
+                                } }),
+                            React.createElement("span", { style: { fontSize: 14, color: C.muted } }, "metres")),
+                        React.createElement("input", { type: "range", min: "0", max: "3.4", step: "0.1", value: qLevel, onChange: (e) => setQLevel(+e.target.value), style: { width: "100%", accentColor: C.brand } }),
+                        React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14 } }, [["all", "All months (Jul–Dec)"], ["month", `${month.name} only`]].map(([k, lbl]) => (React.createElement("button", { key: k, onClick: () => setQScope(k), style: segBtn(qScope === k, C.brand) }, lbl))))),
+                    React.createElement("div", { style: { background: C.abyss, border: `1px solid ${C.edge}`, borderRadius: 14, padding: 18, textAlign: "center" } },
+                        React.createElement("div", { style: { fontSize: 12, color: C.muted, lineHeight: 1.5 } },
+                            "Days with ",
+                            qTide === "high" ? "high tide" : "low tide",
+                            " ",
+                            React.createElement("b", { style: { color: C.ink } },
+                                qTide === "high" ? "≥" : "≤",
+                                " ",
+                                qLevel.toFixed(1),
+                                " m"),
+                            React.createElement("br", null),
+                            qScope === "all" ? "across Jul–Dec 2026" : `in ${month.name} 2026`),
+                        React.createElement("div", { style: { display: "flex", justifyContent: "center", alignItems: "baseline", gap: 18, marginTop: 10 } },
+                            React.createElement("div", null,
+                                React.createElement("div", { style: { fontSize: 44, fontWeight: 800, color: C.brand, lineHeight: 1 } }, query.count),
+                                React.createElement("div", { style: { fontSize: 11, color: C.muted, marginTop: 2 } },
+                                    "days of ",
+                                    query.total)),
+                            React.createElement("div", { style: { width: 1, height: 46, background: C.edge } }),
+                            React.createElement("div", null,
+                                React.createElement("div", { style: { fontSize: 44, fontWeight: 800, color: C.ink, lineHeight: 1 } },
+                                    query.pct.toFixed(0),
+                                    "%"),
+                                React.createElement("div", { style: { fontSize: 11, color: C.muted, marginTop: 2 } }, "of all days"))),
+                        React.createElement("div", { style: { height: 8, borderRadius: 4, background: C.panelAlt, marginTop: 14, overflow: "hidden" } },
+                            React.createElement("div", { style: { height: "100%", width: `${query.pct}%`, background: C.brand, transition: "width .2s" } })))),
+                React.createElement("details", { style: { marginTop: 14 } },
+                    React.createElement("summary", { style: { cursor: "pointer", fontSize: 13, fontWeight: 600, color: C.muted } },
+                        "See the ",
+                        query.count,
+                        " matching day",
+                        query.count === 1 ? "" : "s"),
+                    React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 } },
+                        query.match.length === 0 && (React.createElement("span", { style: { fontSize: 13, color: C.faint } }, "No days meet this condition.")),
+                        query.match.map((r, i) => (React.createElement("span", { key: i, style: {
+                                fontSize: 12, padding: "4px 9px", borderRadius: 7,
+                                background: C.panelAlt, border: `1px solid ${C.edge}`, color: C.ink,
+                            } },
+                            r.mName.slice(0, 3),
+                            " ",
+                            r.d,
+                            " \u00B7 ",
+                            qTide === "high" ? r.highH : r.lowH,
+                            " m")))))),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 } },
                 React.createElement(Insight, { title: "Highest high tide", value: `${stats.topHigh.highH} m`, sub: `Day ${stats.topHigh.d}, ${stats.topHigh.highT}`, color: C.high }),
                 React.createElement(Insight, { title: "Lowest low tide", value: `${stats.lowLow.lowH} m`, sub: `Day ${stats.lowLow.d}, ${stats.lowLow.lowT}`, color: C.low }),
@@ -365,6 +441,16 @@ function App() {
         button:hover { filter: brightness(1.08); }
         summary::-webkit-details-marker { color: ${C.low}; }
       `)));
+}
+function segBtn(active, accent) {
+    return {
+        flex: 1, padding: "9px 10px", borderRadius: 9, fontSize: 12.5, fontWeight: 600,
+        cursor: "pointer", whiteSpace: "nowrap",
+        border: `1px solid ${active ? accent : "#1E4A6B"}`,
+        background: active ? accent : "transparent",
+        color: active ? "#06192B" : "#EAF3FA",
+        transition: "all .15s",
+    };
 }
 function navBtn(disabled) {
     return {
