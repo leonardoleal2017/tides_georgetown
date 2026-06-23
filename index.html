@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOF · Georgetown Tide Dashboard 2026</title>
+  <style>
+    html, body { margin: 0; background: #06192B; }
+    #root { min-height: 100vh; }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+"use strict";
+const { useState, useMemo } = React;
+/* ──────────────────────────────────────────────────────────────
+   DOF · GEORGETOWN TIDE DASHBOARD · 2026
+   Brand palette: deep ocean navy + DOF blue accents (dof.com)
+   Source: Admiralty Tide Tables (daily extremes)
+   ────────────────────────────────────────────────────────────── */
+const C = {
+    abyss: "#06192B", // deep ocean navy (DOF dark)
+    panel: "#0C2840",
+    panelAlt: "#123A58",
+    edge: "#1E4A6B",
+    ink: "#EAF3FA",
+    muted: "#8AA6BC",
+    faint: "#5A7E97",
+    high: "#00A3E0", // high tide — DOF blue (primary)
+    low: "#8FD4F0", // low tide — DOF ice blue
+    spring: "#22B8F0", // spring tide / large range — bright DOF blue
+    brand: "#00A3E0", // DOF accent
+};
+// [day, lowTime, lowHeight, highTime, highHeight]
+const RAW = {
+    July: { idx: 6, days: [
+            [1, "11:25", 0.6, "04:53", 2.8], [2, "12:00", 0.6, "05:33", 2.8], [3, "12:34", 0.7, "06:15", 2.8],
+            [4, "13:06", 0.7, "06:57", 2.7], [5, "13:41", 0.8, "07:41", 2.7], [6, "14:19", 0.9, "20:04", 2.6],
+            [7, "15:05", 1.0, "21:02", 2.6], [8, "16:01", 1.1, "22:27", 2.6], [9, "05:19", 1.0, "23:43", 2.7],
+            [10, "06:26", 0.9, "13:07", 2.4], [11, "07:30", 0.7, "00:45", 2.8], [12, "08:30", 0.6, "01:41", 2.9],
+            [13, "09:25", 0.5, "02:35", 3.0], [14, "10:16", 0.4, "03:29", 3.1], [15, "11:03", 0.3, "04:22", 3.2],
+            [16, "11:47", 0.3, "05:14", 3.2], [17, "12:29", 0.4, "06:04", 3.1], [18, "13:08", 0.6, "06:55", 3.0],
+            [19, "13:47", 0.8, "07:46", 2.8], [20, "02:34", 0.9, "08:37", 2.6], [21, "03:35", 1.0, "22:21", 2.4],
+            [22, "04:39", 1.0, "23:32", 2.4], [23, "05:41", 1.0, "11:26", 2.1], [24, "06:40", 1.0, "00:37", 2.4],
+            [25, "07:33", 0.9, "01:29", 2.5], [26, "08:21", 0.8, "02:13", 2.6], [27, "09:05", 0.7, "02:50", 2.7],
+            [28, "09:47", 0.7, "03:25", 2.8], [29, "10:25", 0.6, "04:01", 2.8], [30, "11:01", 0.5, "04:37", 2.9],
+            [31, "11:35", 0.5, "05:15", 2.9],
+        ] },
+    August: { idx: 7, days: [
+            [1, "12:07", 0.5, "05:53", 2.9], [2, "12:38", 0.6, "18:27", 2.9], [3, "13:12", 0.7, "18:55", 2.9],
+            [4, "13:50", 0.8, "19:33", 2.8], [5, "14:34", 0.9, "20:22", 2.7], [6, "03:40", 1.1, "21:37", 2.6],
+            [7, "05:02", 1.0, "23:10", 2.6], [8, "06:19", 0.9, "13:02", 2.3], [9, "07:25", 0.8, "00:31", 2.7],
+            [10, "08:21", 0.6, "01:38", 2.9], [11, "09:12", 0.5, "02:34", 3.0], [12, "09:58", 0.4, "03:25", 3.1],
+            [13, "10:42", 0.4, "04:13", 3.2], [14, "11:23", 0.4, "04:59", 3.2], [15, "12:01", 0.5, "05:42", 3.1],
+            [16, "00:21", 0.5, "06:26", 3.0], [17, "01:05", 0.7, "07:08", 2.8], [18, "01:52", 0.8, "07:53", 2.6],
+            [19, "02:46", 1.0, "20:50", 2.4], [20, "03:52", 1.1, "22:29", 2.3], [21, "05:08", 1.1, "10:53", 2.1],
+            [22, "06:16", 1.0, "00:05", 2.3], [23, "07:11", 0.9, "01:09", 2.4], [24, "07:58", 0.8, "01:56", 2.5],
+            [25, "08:40", 0.7, "02:33", 2.7], [26, "09:19", 0.6, "03:07", 2.8], [27, "09:56", 0.5, "03:42", 2.9],
+            [28, "10:31", 0.5, "04:17", 3.0], [29, "11:05", 0.5, "04:54", 3.1], [30, "11:38", 0.5, "17:36", 3.1],
+            [31, "12:12", 0.5, "18:02", 3.1],
+        ] },
+    September: { idx: 8, days: [
+            [1, "12:47", 0.6, "18:34", 3.0], [2, "01:14", 0.8, "19:13", 2.9], [3, "02:08", 0.9, "20:04", 2.7],
+            [4, "03:23", 1.0, "21:19", 2.5], [5, "05:00", 1.0, "23:00", 2.5], [6, "06:18", 0.9, "13:01", 2.4],
+            [7, "07:18", 0.8, "00:36", 2.6], [8, "08:09", 0.6, "14:52", 2.8], [9, "08:54", 0.5, "15:35", 3.0],
+            [10, "21:53", 0.4, "16:13", 3.1], [11, "22:36", 0.4, "16:49", 3.2], [12, "23:17", 0.4, "17:22", 3.2],
+            [13, "23:56", 0.5, "17:53", 3.1], [14, "12:05", 0.7, "18:20", 3.0], [15, "00:34", 0.6, "18:43", 2.8],
+            [16, "01:14", 0.8, "19:11", 2.6], [17, "02:00", 1.0, "19:52", 2.4], [18, "03:00", 1.1, "21:10", 2.2],
+            [19, "04:26", 1.2, "23:22", 2.2], [20, "05:48", 1.1, "11:52", 2.1], [21, "06:45", 1.0, "00:38", 2.3],
+            [22, "07:30", 0.9, "01:28", 2.5], [23, "08:10", 0.8, "02:06", 2.7], [24, "08:47", 0.6, "02:42", 2.8],
+            [25, "09:23", 0.5, "03:18", 3.0], [26, "09:59", 0.5, "03:56", 3.0], [27, "22:59", 0.4, "16:38", 3.1],
+            [28, "23:37", 0.5, "17:09", 3.1], [29, "11:48", 0.5, "17:42", 3.1], [30, "00:16", 0.5, "18:19", 3.0],
+        ] },
+    October: { idx: 9, days: [
+            [1, "01:01", 0.7, "19:03", 2.9], [2, "01:57", 0.9, "19:59", 2.7], [3, "03:15", 1.0, "21:17", 2.5],
+            [4, "04:52", 1.0, "23:01", 2.5], [5, "06:06", 1.0, "12:47", 2.5], [6, "07:04", 0.8, "13:40", 2.7],
+            [7, "20:03", 0.7, "14:24", 2.9], [8, "20:50", 0.5, "15:04", 3.0], [9, "21:34", 0.4, "15:41", 3.1],
+            [10, "22:15", 0.4, "16:16", 3.1], [11, "22:55", 0.4, "16:49", 3.1], [12, "23:32", 0.5, "17:19", 3.0],
+            [13, "11:35", 0.8, "17:44", 2.9], [14, "00:07", 0.6, "18:11", 2.8], [15, "00:44", 0.8, "18:46", 2.6],
+            [16, "01:26", 0.9, "19:30", 2.5], [17, "02:17", 1.1, "20:36", 2.3], [18, "03:25", 1.2, "22:15", 2.2],
+            [19, "04:49", 1.2, "23:42", 2.3], [20, "05:58", 1.1, "12:16", 2.3], [21, "06:49", 1.0, "13:04", 2.5],
+            [22, "07:31", 0.9, "13:43", 2.7], [23, "08:09", 0.8, "14:20", 2.8], [24, "21:17", 0.6, "14:56", 3.0],
+            [25, "21:58", 0.5, "15:31", 3.1], [26, "22:39", 0.4, "16:07", 3.1], [27, "23:21", 0.4, "16:44", 3.2],
+            [28, "11:29", 0.6, "17:24", 3.1], [29, "00:05", 0.5, "18:08", 3.0], [30, "00:53", 0.6, "18:58", 2.9],
+            [31, "01:49", 0.8, "19:58", 2.7],
+        ] },
+    November: { idx: 10, days: [
+            [1, "03:01", 1.0, "21:16", 2.6], [2, "04:23", 1.0, "22:47", 2.5], [3, "05:35", 1.0, "12:19", 2.6],
+            [4, "18:49", 0.9, "13:10", 2.8], [5, "19:41", 0.7, "13:53", 2.9], [6, "20:28", 0.6, "14:32", 2.9],
+            [7, "21:13", 0.6, "15:09", 3.0], [8, "21:54", 0.5, "15:44", 3.0], [9, "22:34", 0.5, "16:18", 2.9],
+            [10, "23:11", 0.6, "16:47", 2.9], [11, "23:46", 0.6, "17:16", 2.8], [12, "11:41", 1.0, "17:50", 2.7],
+            [13, "00:23", 0.8, "18:29", 2.6], [14, "01:02", 0.9, "19:15", 2.5], [15, "01:46", 1.0, "20:12", 2.4],
+            [16, "02:37", 1.1, "21:22", 2.4], [17, "03:36", 1.2, "22:37", 2.4], [18, "04:39", 1.2, "23:44", 2.4],
+            [19, "05:40", 1.1, "12:09", 2.5], [20, "19:09", 1.0, "12:54", 2.6], [21, "19:59", 0.8, "13:36", 2.8],
+            [22, "20:47", 0.6, "14:16", 2.9], [23, "21:35", 0.5, "14:57", 3.0], [24, "22:22", 0.4, "15:39", 3.1],
+            [25, "23:08", 0.4, "16:23", 3.1], [26, "23:55", 0.4, "17:10", 3.1], [27, "12:04", 0.7, "17:59", 3.1],
+            [28, "00:42", 0.5, "18:52", 2.9], [29, "01:33", 0.7, "19:53", 2.8], [30, "02:31", 0.9, "21:01", 2.6],
+        ] },
+    December: { idx: 11, days: [
+            [1, "03:35", 1.0, "10:29", 2.6], [2, "17:18", 1.0, "11:34", 2.6], [3, "18:19", 0.9, "12:31", 2.7],
+            [4, "19:14", 0.8, "13:18", 2.7], [5, "20:04", 0.8, "14:00", 2.8], [6, "20:50", 0.7, "14:39", 2.8],
+            [7, "21:34", 0.7, "15:17", 2.8], [8, "22:14", 0.6, "15:52", 2.8], [9, "22:52", 0.6, "16:25", 2.8],
+            [10, "23:29", 0.7, "16:58", 2.8], [11, "11:27", 1.0, "17:34", 2.8], [12, "00:04", 0.7, "18:14", 2.7],
+            [13, "00:40", 0.8, "18:56", 2.7], [14, "01:17", 0.9, "19:41", 2.6], [15, "01:55", 1.0, "20:33", 2.5],
+            [16, "02:38", 1.1, "21:34", 2.4], [17, "03:27", 1.1, "10:00", 2.4], [18, "17:14", 1.2, "11:02", 2.4],
+            [19, "18:20", 1.0, "11:58", 2.6], [20, "19:23", 0.9, "12:49", 2.7], [21, "20:21", 0.7, "13:39", 2.8],
+            [22, "21:15", 0.6, "14:28", 3.0], [23, "22:06", 0.4, "15:18", 3.1], [24, "22:54", 0.4, "16:08", 3.1],
+            [25, "23:39", 0.4, "16:59", 3.2], [26, "11:51", 0.6, "17:49", 3.1], [27, "00:24", 0.5, "18:40", 3.0],
+            [28, "01:09", 0.6, "19:34", 2.9], [29, "01:55", 0.8, "20:31", 2.7], [30, "15:33", 1.0, "09:35", 2.6],
+            [31, "16:38", 1.0, "10:35", 2.5],
+        ] },
+};
+const MONTHS = Object.entries(RAW).map(([name, { idx, days }]) => ({
+    name,
+    idx,
+    days: days.map(([d, lt, lh, ht, hh]) => ({
+        d, lowT: lt, lowH: lh, highT: ht, highH: hh, range: +(hh - lh).toFixed(1),
+    })),
+}));
+const WD = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+const WD_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+// Tidal range classification
+function tideClass(range) {
+    if (range >= 2.4)
+        return { label: "Spring tide", note: "large range", color: C.spring };
+    if (range >= 1.6)
+        return { label: "Medium tide", note: "moderate range", color: C.high };
+    return { label: "Neap tide", note: "small range", color: C.low };
+}
+// Colour interpolation for the calendar heatmap
+function rangeColor(range, min, max) {
+    const t = Math.max(0, Math.min(1, (range - min) / (max - min || 1)));
+    const a = [30, 74, 107]; // DOF steel (small range)
+    const b = [0, 163, 224]; // DOF blue (large range)
+    const rgb = a.map((v, i) => Math.round(v + (b[i] - v) * t));
+    return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+}
+/* ── Tide ribbon chart (the dashboard signature) ─────────────── */
+function TideRibbon({ month, selectedDay, onPick }) {
+    const W = 820, H = 280, padL = 38, padR = 14, padT = 18, padB = 30;
+    const plotW = W - padL - padR, plotH = H - padT - padB;
+    const N = month.days.length;
+    const hMin = 0, hMax = 3.4;
+    const x = (d) => padL + ((d - 1) / (N - 1)) * plotW;
+    const y = (h) => padT + (1 - (h - hMin) / (hMax - hMin)) * plotH;
+    const highPts = month.days.map((r) => [x(r.d), y(r.highH)]);
+    const lowPts = month.days.map((r) => [x(r.d), y(r.lowH)]);
+    const toPath = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+    const band = toPath(highPts) +
+        " " + lowPts.slice().reverse().map((p) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ") +
+        " Z";
+    const yticks = [0, 1, 2, 3];
+    const xticks = month.days.filter((r) => r.d === 1 || r.d % 5 === 0);
+    const sel = month.days.find((r) => r.d === selectedDay);
+    return (React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", style: { display: "block", touchAction: "manipulation" } },
+        React.createElement("defs", null,
+            React.createElement("linearGradient", { id: "bandGrad", x1: "0", y1: "0", x2: "0", y2: "1" },
+                React.createElement("stop", { offset: "0%", stopColor: C.high, stopOpacity: "0.30" }),
+                React.createElement("stop", { offset: "100%", stopColor: C.low, stopOpacity: "0.30" }))),
+        yticks.map((t) => (React.createElement("g", { key: t },
+            React.createElement("line", { x1: padL, y1: y(t), x2: W - padR, y2: y(t), stroke: C.edge, strokeWidth: "1", strokeDasharray: "2 4" }),
+            React.createElement("text", { x: padL - 8, y: y(t) + 4, textAnchor: "end", fontSize: "11", fill: C.faint },
+                t,
+                "m")))),
+        React.createElement("path", { d: band, fill: "url(#bandGrad)", stroke: "none" }),
+        React.createElement("path", { d: toPath(highPts), fill: "none", stroke: C.high, strokeWidth: "2" }),
+        React.createElement("path", { d: toPath(lowPts), fill: "none", stroke: C.low, strokeWidth: "2" }),
+        sel && (React.createElement("g", null,
+            React.createElement("line", { x1: x(sel.d), y1: padT, x2: x(sel.d), y2: H - padB, stroke: C.ink, strokeOpacity: "0.5", strokeWidth: "1" }),
+            React.createElement("circle", { cx: x(sel.d), cy: y(sel.highH), r: "5", fill: C.high, stroke: C.abyss, strokeWidth: "1.5" }),
+            React.createElement("circle", { cx: x(sel.d), cy: y(sel.lowH), r: "5", fill: C.low, stroke: C.abyss, strokeWidth: "1.5" }))),
+        xticks.map((r) => (React.createElement("text", { key: r.d, x: x(r.d), y: H - padB + 18, textAnchor: "middle", fontSize: "11", fill: C.faint }, r.d))),
+        month.days.map((r) => (React.createElement("rect", { key: r.d, x: x(r.d) - plotW / N / 2, y: padT, width: plotW / N, height: plotH, fill: "transparent", style: { cursor: "pointer" }, onClick: () => onPick(r.d) })))));
+}
+function App() {
+    const [mi, setMi] = useState(0);
+    const month = MONTHS[mi];
+    // default to the day with the highest high tide
+    const defaultDay = useMemo(() => {
+        return month.days.reduce((a, b) => (b.highH > a.highH ? b : a)).d;
+    }, [mi]);
+    const [day, setDay] = useState(defaultDay);
+    // when the month changes, relocate the selected day
+    const onMonth = (i) => {
+        setMi(i);
+        const m = MONTHS[i];
+        const dd = m.days.reduce((a, b) => (b.highH > a.highH ? b : a)).d;
+        setDay(dd);
+    };
+    const rec = month.days.find((r) => r.d === day) || month.days[0];
+    const cls = tideClass(rec.range);
+    // monthly statistics
+    const stats = useMemo(() => {
+        const ranges = month.days.map((r) => r.range);
+        const minR = Math.min(...ranges), maxR = Math.max(...ranges);
+        const topHigh = month.days.reduce((a, b) => (b.highH > a.highH ? b : a));
+        const lowLow = month.days.reduce((a, b) => (b.lowH < a.lowH ? b : a));
+        const biggest = month.days.reduce((a, b) => (b.range > a.range ? b : a));
+        const smallest = month.days.reduce((a, b) => (b.range < a.range ? b : a));
+        const springs = month.days.filter((r) => r.range >= 2.4).map((r) => r.d);
+        return { minR, maxR, topHigh, lowLow, biggest, smallest, springs };
+    }, [mi]);
+    const firstWD = (new Date(2026, month.idx, 1).getDay() + 6) % 7; // 0 = Monday
+    const weekdayName = WD_LONG[(new Date(2026, month.idx, rec.d).getDay() + 6) % 7];
+    const card = { background: C.panel, border: `1px solid ${C.edge}`, borderRadius: 14 };
+    return (React.createElement("div", { style: {
+            background: `radial-gradient(120% 80% at 50% -10%, #0C3A5C 0%, ${C.abyss} 58%)`,
+            color: C.ink, minHeight: "100%", padding: "22px 18px 34px",
+            fontFamily: "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+            fontVariantNumeric: "tabular-nums",
+        } },
+        React.createElement("div", { style: { maxWidth: 1080, margin: "0 auto" } },
+            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, justifyContent: "space-between" } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 16 } },
+                    React.createElement("div", { style: {
+                            fontSize: 24, fontWeight: 800, letterSpacing: 1, color: "#FFFFFF",
+                            background: C.brand, padding: "8px 14px", borderRadius: 8, lineHeight: 1,
+                            boxShadow: "0 4px 18px rgba(0,163,224,0.35)",
+                        } }, "DOF"),
+                    React.createElement("div", { style: { width: 1, height: 38, background: C.edge } }),
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { letterSpacing: 2.5, fontSize: 11, color: C.brand, textTransform: "uppercase", fontWeight: 700 } }, "Tide intelligence \u00B7 6\u00B050\u2032N 58\u00B010\u2032W Guyana"),
+                        React.createElement("h1", { style: { margin: "3px 0 0", fontSize: 28, fontWeight: 700, letterSpacing: -0.5 } }, "Georgetown Tides \u00B7 2026"))),
+                React.createElement("div", { style: { display: "flex", gap: 16, fontSize: 12, color: C.muted } },
+                    React.createElement("span", null,
+                        React.createElement("span", { style: { color: C.high, fontWeight: 700 } }, "\u25CF"),
+                        " High tide"),
+                    React.createElement("span", null,
+                        React.createElement("span", { style: { color: C.low, fontWeight: 700 } }, "\u25CF"),
+                        " Low tide"))),
+            React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 18 } }, MONTHS.map((m, i) => (React.createElement("button", { key: m.name, onClick: () => onMonth(i), style: {
+                    padding: "8px 16px", borderRadius: 999, fontSize: 14, cursor: "pointer",
+                    border: `1px solid ${i === mi ? C.low : C.edge}`,
+                    background: i === mi ? C.low : "transparent",
+                    color: i === mi ? C.abyss : C.ink, fontWeight: i === mi ? 700 : 500,
+                    transition: "all .15s",
+                } }, m.name)))),
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 16, marginTop: 16, alignItems: "stretch" }, className: "grid-main" },
+                React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 16 }) },
+                    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 } },
+                        React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } },
+                            month.name,
+                            " 2026"),
+                        React.createElement("span", { style: { fontSize: 11, color: C.muted } }, "colour = range \u00B7 tap a day")),
+                    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 6 } },
+                        WD.map((w, i) => (React.createElement("div", { key: i, style: { textAlign: "center", fontSize: 11, color: C.faint, paddingBottom: 2 } }, w))),
+                        Array.from({ length: firstWD }).map((_, i) => React.createElement("div", { key: "e" + i })),
+                        month.days.map((r) => {
+                            const active = r.d === day;
+                            return (React.createElement("button", { key: r.d, onClick: () => setDay(r.d), title: `${r.d} · high ${r.highH}m / low ${r.lowH}m`, style: {
+                                    aspectRatio: "1 / 1", borderRadius: 9, cursor: "pointer",
+                                    border: active ? `2px solid ${C.ink}` : "1px solid rgba(0,0,0,0.25)",
+                                    background: rangeColor(r.range, stats.minR, stats.maxR),
+                                    color: "#FFFFFF", fontWeight: 700, fontSize: 13,
+                                    textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                                    lineHeight: 1, position: "relative", padding: 0,
+                                } },
+                                React.createElement("span", null, r.d),
+                                React.createElement("span", { style: { fontSize: 9, opacity: 0.9, fontWeight: 600, marginTop: 2 } },
+                                    r.highH,
+                                    "\u2191")));
+                        })),
+                    React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 11, color: C.muted } },
+                        React.createElement("span", null, "smaller"),
+                        React.createElement("div", { style: { flex: 1, height: 8, borderRadius: 4, background: `linear-gradient(90deg, ${rangeColor(stats.minR, stats.minR, stats.maxR)}, ${rangeColor(stats.maxR, stats.minR, stats.maxR)})` } }),
+                        React.createElement("span", null, "larger range"))),
+                React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 18, display: "flex", flexDirection: "column" }) },
+                    React.createElement("div", { style: { fontSize: 12, color: C.muted } }, weekdayName),
+                    React.createElement("div", { style: { fontSize: 26, fontWeight: 700, marginTop: 2 } },
+                        month.name,
+                        " ",
+                        String(rec.d).padStart(2, "0")),
+                    React.createElement("div", { style: { display: "flex", gap: 12, marginTop: 16 } },
+                        React.createElement("div", { style: { flex: 1, background: C.panelAlt, borderRadius: 12, padding: "14px 14px", borderTop: `3px solid ${C.high}` } },
+                            React.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, "High tide"),
+                            React.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: C.high } },
+                                rec.highH,
+                                React.createElement("span", { style: { fontSize: 14, color: C.muted } }, " m")),
+                            React.createElement("div", { style: { fontSize: 14, color: C.ink, marginTop: 2 } },
+                                "at ",
+                                rec.highT)),
+                        React.createElement("div", { style: { flex: 1, background: C.panelAlt, borderRadius: 12, padding: "14px 14px", borderTop: `3px solid ${C.low}` } },
+                            React.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, "Low tide"),
+                            React.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: C.low } },
+                                rec.lowH,
+                                React.createElement("span", { style: { fontSize: 14, color: C.muted } }, " m")),
+                            React.createElement("div", { style: { fontSize: 14, color: C.ink, marginTop: 2 } },
+                                "at ",
+                                rec.lowT))),
+                    React.createElement("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.edge}` } },
+                        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+                            React.createElement("span", { style: { fontSize: 13, color: C.muted } }, "Range"),
+                            React.createElement("span", { style: { fontSize: 20, fontWeight: 700 } },
+                                rec.range,
+                                " m")),
+                        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } },
+                            React.createElement("span", { style: { width: 10, height: 10, borderRadius: 3, background: cls.color } }),
+                            React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: cls.color } }, cls.label),
+                            React.createElement("span", { style: { fontSize: 12, color: C.muted } },
+                                "\u00B7 ",
+                                cls.note))),
+                    React.createElement("div", { style: { display: "flex", gap: 8, marginTop: "auto", paddingTop: 16 } },
+                        React.createElement("button", { onClick: () => setDay(Math.max(1, day - 1)), disabled: day <= 1, style: navBtn(day <= 1) }, "\u2190 Previous day"),
+                        React.createElement("button", { onClick: () => setDay(Math.min(month.days.length, day + 1)), disabled: day >= month.days.length, style: navBtn(day >= month.days.length) }, "Next day \u2192")))),
+            React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 16, marginTop: 16 }) },
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 } },
+                    React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, "Full month \u00B7 high & low tide day by day"),
+                    React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "The band widens at spring tides and narrows at neaps")),
+                React.createElement(TideRibbon, { month: month, selectedDay: day, onPick: setDay })),
+            React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 } },
+                React.createElement(Insight, { title: "Highest high tide", value: `${stats.topHigh.highH} m`, sub: `Day ${stats.topHigh.d}, ${stats.topHigh.highT}`, color: C.high }),
+                React.createElement(Insight, { title: "Lowest low tide", value: `${stats.lowLow.lowH} m`, sub: `Day ${stats.lowLow.d}, ${stats.lowLow.lowT}`, color: C.low }),
+                React.createElement(Insight, { title: "Largest range", value: `${stats.biggest.range} m`, sub: `Day ${stats.biggest.d} · spring tide`, color: C.spring }),
+                React.createElement(Insight, { title: "Smallest range", value: `${stats.smallest.range} m`, sub: `Day ${stats.smallest.d} · neap tide`, color: C.muted })),
+            React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 16, marginTop: 12 }) },
+                React.createElement("h3", { style: { margin: "0 0 6px", fontSize: 14, fontWeight: 600 } }, "What's the pattern?"),
+                React.createElement("p", { style: { margin: 0, fontSize: 13.5, color: C.muted, lineHeight: 1.6 } },
+                    "The range rises and falls on a cycle of about ",
+                    React.createElement("b", { style: { color: C.ink } }, "14\u201315 days"),
+                    ":",
+                    React.createElement("b", { style: { color: C.spring } }, " spring tides"),
+                    " (very high highs + very low lows) alternate with",
+                    React.createElement("b", { style: { color: C.low } }, " neap tides"),
+                    " (everything more even). In ",
+                    month.name,
+                    " the spring tides fall around days ",
+                    React.createElement("b", { style: { color: C.ink } }, stats.springs.length ? stats.springs.join(", ") : "—"),
+                    ". The time of high water also shifts each day, so it's worth checking the exact day you need.")),
+            React.createElement("details", { style: Object.assign(Object.assign({}, card), { padding: 16, marginTop: 12 }) },
+                React.createElement("summary", { style: { cursor: "pointer", fontSize: 14, fontWeight: 600 } },
+                    "View full table for ",
+                    month.name),
+                React.createElement("div", { style: { overflowX: "auto", marginTop: 12 } },
+                    React.createElement("table", { style: { width: "100%", borderCollapse: "collapse", fontSize: 13 } },
+                        React.createElement("thead", null,
+                            React.createElement("tr", { style: { color: C.muted, textAlign: "left" } },
+                                React.createElement("th", { style: th }, "Day"),
+                                React.createElement("th", { style: th }, "High tide"),
+                                React.createElement("th", { style: th }, "Height"),
+                                React.createElement("th", { style: th }, "Low tide"),
+                                React.createElement("th", { style: th }, "Height"),
+                                React.createElement("th", { style: th }, "Range"))),
+                        React.createElement("tbody", null, month.days.map((r) => (React.createElement("tr", { key: r.d, onClick: () => setDay(r.d), style: { cursor: "pointer", background: r.d === day ? "rgba(79,196,192,0.12)" : "transparent" } },
+                            React.createElement("td", { style: td }, r.d),
+                            React.createElement("td", { style: td }, r.highT),
+                            React.createElement("td", { style: Object.assign(Object.assign({}, td), { color: C.high, fontWeight: 600 }) },
+                                r.highH,
+                                " m"),
+                            React.createElement("td", { style: td }, r.lowT),
+                            React.createElement("td", { style: Object.assign(Object.assign({}, td), { color: C.low, fontWeight: 600 }) },
+                                r.lowH,
+                                " m"),
+                            React.createElement("td", { style: td },
+                                r.range,
+                                " m")))))))),
+            React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 18, textAlign: "center" } }, "DOF \u00B7 Georgetown (2290) \u00B7 heights in metres above chart datum \u00B7 Admiralty Tide Tables (daily extremes) \u00B7 British Crown Copyright \u00A9 2020")),
+        React.createElement("style", null, `
+        @media (max-width: 720px) {
+          .grid-main { grid-template-columns: 1fr !important; }
+        }
+        button:hover { filter: brightness(1.08); }
+        summary::-webkit-details-marker { color: ${C.low}; }
+      `)));
+}
+function navBtn(disabled) {
+    return {
+        flex: 1, padding: "10px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+        border: `1px solid ${C.edge}`, background: "transparent",
+        color: disabled ? C.faint : C.ink, cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+    };
+}
+function Insight({ title, value, sub, color }) {
+    return (React.createElement("div", { style: { background: C.panel, border: `1px solid ${C.edge}`, borderRadius: 14, padding: 14, borderLeft: `3px solid ${color}` } },
+        React.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, title),
+        React.createElement("div", { style: { fontSize: 24, fontWeight: 700, marginTop: 4, color } }, value),
+        React.createElement("div", { style: { fontSize: 12, color: C.muted, marginTop: 2 } }, sub)));
+}
+const th = { padding: "8px 10px", borderBottom: `1px solid ${C.edge}`, fontWeight: 600 };
+const td = { padding: "8px 10px", borderBottom: `1px solid rgba(27,66,80,0.5)` };
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
+</body>
+</html>
