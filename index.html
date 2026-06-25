@@ -8,8 +8,8 @@
     html, body { margin: 0; background: #06192B; }
     #root { min-height: 100vh; }
   </style>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -19,7 +19,7 @@ const { useState, useMemo } = React;
 /* ──────────────────────────────────────────────────────────────
    DOF · GEORGETOWN TIDE DASHBOARD · 2026
    Brand palette: deep ocean navy + DOF blue accents (dof.com)
-   Source: Admiralty Tide Tables (daily extremes)
+   Source: tide-forecast.com / tidetime.org (semidiurnal: 2 highs + 2 lows per day)
    ────────────────────────────────────────────────────────────── */
 const C = {
     abyss: "#06192B", // deep ocean navy (DOF dark)
@@ -34,99 +34,258 @@ const C = {
     spring: "#22B8F0", // spring tide / large range — bright DOF blue
     brand: "#00A3E0", // DOF accent
 };
-// [day, lowTime, lowHeight, highTime, highHeight]
+// Semidiurnal data: 2 highs + 2 lows per day, heights in METRES
+// (tide-forecast.com / tidetime.org datum). UI toggles m/ft.
 const RAW = {
     July: { idx: 6, days: [
-            [1, "11:25", 0.6, "04:53", 2.8], [2, "12:00", 0.6, "05:33", 2.8], [3, "12:34", 0.7, "06:15", 2.8],
-            [4, "13:06", 0.7, "06:57", 2.7], [5, "13:41", 0.8, "07:41", 2.7], [6, "14:19", 0.9, "20:04", 2.6],
-            [7, "15:05", 1.0, "21:02", 2.6], [8, "16:01", 1.1, "22:27", 2.6], [9, "05:19", 1.0, "23:43", 2.7],
-            [10, "06:26", 0.9, "13:07", 2.4], [11, "07:30", 0.7, "00:45", 2.8], [12, "08:30", 0.6, "01:41", 2.9],
-            [13, "09:25", 0.5, "02:35", 3.0], [14, "10:16", 0.4, "03:29", 3.1], [15, "11:03", 0.3, "04:22", 3.2],
-            [16, "11:47", 0.3, "05:14", 3.2], [17, "12:29", 0.4, "06:04", 3.1], [18, "13:08", 0.6, "06:55", 3.0],
-            [19, "13:47", 0.8, "07:46", 2.8], [20, "02:34", 0.9, "08:37", 2.6], [21, "03:35", 1.0, "22:21", 2.4],
-            [22, "04:39", 1.0, "23:32", 2.4], [23, "05:41", 1.0, "11:26", 2.1], [24, "06:40", 1.0, "00:37", 2.4],
-            [25, "07:33", 0.9, "01:29", 2.5], [26, "08:21", 0.8, "02:13", 2.6], [27, "09:05", 0.7, "02:50", 2.7],
-            [28, "09:47", 0.7, "03:25", 2.8], [29, "10:25", 0.6, "04:01", 2.8], [30, "11:01", 0.5, "04:37", 2.9],
-            [31, "11:35", 0.5, "05:15", 2.9],
+            {d:1,highs:[["05:04",2.52],["17:34",2.4]],lows:[["11:08",0.69],["23:18",0.82]]},
+            {d:2,highs:[["05:44",2.55],["18:13",2.42]],lows:[["11:47",0.67],["23:58",0.8]]},
+            {d:3,highs:[["06:24",2.55],["18:52",2.43]],lows:[["12:26",0.67]]},
+            {d:4,highs:[["07:06",2.54],["19:34",2.44]],lows:[["00:39",0.78],["13:08",0.69]]},
+            {d:5,highs:[["07:51",2.51],["20:19",2.43]],lows:[["01:24",0.78],["13:51",0.73]]},
+            {d:6,highs:[["08:41",2.46],["21:08",2.42]],lows:[["02:12",0.79],["14:39",0.77]]},
+            {d:7,highs:[["09:35",2.4],["22:02",2.41]],lows:[["03:05",0.8],["15:32",0.83]]},
+            {d:8,highs:[["10:36",2.34],["23:02",2.4]],lows:[["04:04",0.81],["16:30",0.88]]},
+            {d:9,highs:[["11:42",2.31]],lows:[["05:09",0.81],["17:34",0.91]]},
+            {d:10,highs:[["00:07",2.42],["12:50",2.31]],lows:[["06:17",0.78],["18:40",0.91]]},
+            {d:11,highs:[["01:12",2.47],["13:57",2.35]],lows:[["07:24",0.72],["19:44",0.87]]},
+            {d:12,highs:[["02:15",2.54],["14:59",2.41]],lows:[["08:26",0.64],["20:45",0.81]]},
+            {d:13,highs:[["03:14",2.62],["15:54",2.48]],lows:[["09:23",0.56],["21:40",0.73]]},
+            {d:14,highs:[["04:09",2.68],["16:45",2.55]],lows:[["10:15",0.51],["22:31",0.67]]},
+            {d:15,highs:[["04:59",2.72],["17:32",2.58]],lows:[["11:04",0.48],["23:19",0.63]]},
+            {d:16,highs:[["05:46",2.73],["18:16",2.6]],lows:[["11:49",0.49]]},
+            {d:17,highs:[["06:32",2.7],["18:58",2.58]],lows:[["00:05",0.62],["12:32",0.54]]},
+            {d:18,highs:[["07:16",2.63],["19:40",2.53]],lows:[["00:49",0.64],["13:14",0.62]]},
+            {d:19,highs:[["08:00",2.54],["20:22",2.47]],lows:[["01:32",0.69],["13:56",0.72]]},
+            {d:20,highs:[["08:44",2.42],["21:06",2.39]],lows:[["02:17",0.76],["14:38",0.83]]},
+            {d:21,highs:[["09:32",2.3],["21:53",2.31]],lows:[["03:04",0.85],["15:24",0.94]]},
+            {d:22,highs:[["10:24",2.19],["22:46",2.23]],lows:[["03:55",0.94],["16:15",1.04]]},
+            {d:23,highs:[["11:23",2.11],["23:46",2.19]],lows:[["04:53",1.01],["17:14",1.12]]},
+            {d:24,highs:[["12:29",2.07]],lows:[["05:57",1.04],["18:18",1.15]]},
+            {d:25,highs:[["00:51",2.18],["13:35",2.09]],lows:[["07:03",1.03],["19:22",1.12]]},
+            {d:26,highs:[["01:52",2.22],["14:33",2.15]],lows:[["08:02",0.97],["20:19",1.06]]},
+            {d:27,highs:[["02:47",2.3],["15:23",2.23]],lows:[["08:54",0.88],["21:08",0.98]]},
+            {d:28,highs:[["03:34",2.39],["16:05",2.33]],lows:[["09:38",0.8],["21:50",0.88]]},
+            {d:29,highs:[["04:16",2.48],["16:43",2.41]],lows:[["10:17",0.71],["22:29",0.78]]},
+            {d:30,highs:[["04:54",2.57],["17:19",2.49]],lows:[["10:54",0.64],["23:06",0.7]]},
+            {d:31,highs:[["05:31",2.63],["17:54",2.56]],lows:[["11:30",0.59],["23:42",0.63]]}
         ] },
     August: { idx: 7, days: [
-            [1, "12:07", 0.5, "05:53", 2.9], [2, "12:38", 0.6, "18:27", 2.9], [3, "13:12", 0.7, "18:55", 2.9],
-            [4, "13:50", 0.8, "19:33", 2.8], [5, "14:34", 0.9, "20:22", 2.7], [6, "03:40", 1.1, "21:37", 2.6],
-            [7, "05:02", 1.0, "23:10", 2.6], [8, "06:19", 0.9, "13:02", 2.3], [9, "07:25", 0.8, "00:31", 2.7],
-            [10, "08:21", 0.6, "01:38", 2.9], [11, "09:12", 0.5, "02:34", 3.0], [12, "09:58", 0.4, "03:25", 3.1],
-            [13, "10:42", 0.4, "04:13", 3.2], [14, "11:23", 0.4, "04:59", 3.2], [15, "12:01", 0.5, "05:42", 3.1],
-            [16, "00:21", 0.5, "06:26", 3.0], [17, "01:05", 0.7, "07:08", 2.8], [18, "01:52", 0.8, "07:53", 2.6],
-            [19, "02:46", 1.0, "20:50", 2.4], [20, "03:52", 1.1, "22:29", 2.3], [21, "05:08", 1.1, "10:53", 2.1],
-            [22, "06:16", 1.0, "00:05", 2.3], [23, "07:11", 0.9, "01:09", 2.4], [24, "07:58", 0.8, "01:56", 2.5],
-            [25, "08:40", 0.7, "02:33", 2.7], [26, "09:19", 0.6, "03:07", 2.8], [27, "09:56", 0.5, "03:42", 2.9],
-            [28, "10:31", 0.5, "04:17", 3.0], [29, "11:05", 0.5, "04:54", 3.1], [30, "11:38", 0.5, "17:36", 3.1],
-            [31, "12:12", 0.5, "18:02", 3.1],
+            {d:1,highs:[["06:08",2.67],["18:29",2.6]],lows:[["12:05",0.56]]},
+            {d:2,highs:[["06:46",2.68],["19:06",2.62]],lows:[["00:20",0.59],["12:42",0.58]]},
+            {d:3,highs:[["07:27",2.64],["19:46",2.6]],lows:[["00:59",0.58],["13:21",0.62]]},
+            {d:4,highs:[["08:11",2.56],["20:30",2.55]],lows:[["01:42",0.61],["14:03",0.71]]},
+            {d:5,highs:[["09:00",2.44],["21:21",2.47]],lows:[["02:30",0.67],["14:51",0.82]]},
+            {d:6,highs:[["09:58",2.31],["22:21",2.38]],lows:[["03:26",0.77],["15:49",0.94]]},
+            {d:7,highs:[["11:09",2.21],["23:35",2.32]],lows:[["04:34",0.85],["17:00",1.04]]},
+            {d:8,highs:[["12:31",2.18]],lows:[["05:52",0.89],["18:21",1.06]]},
+            {d:9,highs:[["00:55",2.33],["13:50",2.24]],lows:[["07:13",0.84],["19:38",0.99]]},
+            {d:10,highs:[["02:09",2.42],["14:55",2.35]],lows:[["08:21",0.74],["20:43",0.86]]},
+            {d:11,highs:[["03:11",2.54],["15:48",2.48]],lows:[["09:18",0.62],["21:36",0.72]]},
+            {d:12,highs:[["04:04",2.66],["16:33",2.59]],lows:[["10:06",0.53],["22:22",0.6]]},
+            {d:13,highs:[["04:49",2.74],["17:14",2.67]],lows:[["10:48",0.48],["23:04",0.52]]},
+            {d:14,highs:[["05:31",2.77],["17:51",2.7]],lows:[["11:27",0.47],["23:43",0.48]]},
+            {d:15,highs:[["06:09",2.76],["18:27",2.69]],lows:[["12:03",0.51]]},
+            {d:16,highs:[["06:46",2.69],["19:01",2.65]],lows:[["00:20",0.5],["12:38",0.58]]},
+            {d:17,highs:[["07:23",2.59],["19:36",2.57]],lows:[["00:56",0.56],["13:13",0.68]]},
+            {d:18,highs:[["08:00",2.47],["20:13",2.46]],lows:[["01:33",0.66],["13:49",0.8]]},
+            {d:19,highs:[["08:40",2.32],["20:55",2.33]],lows:[["02:13",0.78],["14:28",0.94]]},
+            {d:20,highs:[["09:28",2.17],["21:46",2.2]],lows:[["02:59",0.92],["15:16",1.09]]},
+            {d:21,highs:[["10:29",2.04],["22:52",2.09]],lows:[["03:55",1.05],["16:18",1.21]]},
+            {d:22,highs:[["11:49",1.97]],lows:[["05:10",1.13],["17:40",1.26]]},
+            {d:23,highs:[["00:16",2.06],["13:14",2.01]],lows:[["06:35",1.13],["19:03",1.22]]},
+            {d:24,highs:[["01:34",2.13],["14:19",2.12]],lows:[["07:45",1.04],["20:07",1.09]]},
+            {d:25,highs:[["02:34",2.26],["15:08",2.26]],lows:[["08:38",0.91],["20:55",0.94]]},
+            {d:26,highs:[["03:20",2.4],["15:47",2.4]],lows:[["09:20",0.77],["21:34",0.79]]},
+            {d:27,highs:[["04:00",2.54],["16:21",2.53]],lows:[["09:57",0.65],["22:10",0.65]]},
+            {d:28,highs:[["04:35",2.65],["16:54",2.64]],lows:[["10:31",0.55],["22:44",0.53]]},
+            {d:29,highs:[["05:10",2.74],["17:27",2.72]],lows:[["11:04",0.49],["23:19",0.45]]},
+            {d:30,highs:[["05:45",2.78],["18:00",2.76]],lows:[["11:37",0.48],["23:54",0.41]]},
+            {d:31,highs:[["06:21",2.77],["18:35",2.76]],lows:[["12:12",0.51]]}
         ] },
     September: { idx: 8, days: [
-            [1, "12:47", 0.6, "18:34", 3.0], [2, "01:14", 0.8, "19:13", 2.9], [3, "02:08", 0.9, "20:04", 2.7],
-            [4, "03:23", 1.0, "21:19", 2.5], [5, "05:00", 1.0, "23:00", 2.5], [6, "06:18", 0.9, "13:01", 2.4],
-            [7, "07:18", 0.8, "00:36", 2.6], [8, "08:09", 0.6, "14:52", 2.8], [9, "08:54", 0.5, "15:35", 3.0],
-            [10, "21:53", 0.4, "16:13", 3.1], [11, "22:36", 0.4, "16:49", 3.2], [12, "23:17", 0.4, "17:22", 3.2],
-            [13, "23:56", 0.5, "17:53", 3.1], [14, "12:05", 0.7, "18:20", 3.0], [15, "00:34", 0.6, "18:43", 2.8],
-            [16, "01:14", 0.8, "19:11", 2.6], [17, "02:00", 1.0, "19:52", 2.4], [18, "03:00", 1.1, "21:10", 2.2],
-            [19, "04:26", 1.2, "23:22", 2.2], [20, "05:48", 1.1, "11:52", 2.1], [21, "06:45", 1.0, "00:38", 2.3],
-            [22, "07:30", 0.9, "01:28", 2.5], [23, "08:10", 0.8, "02:06", 2.7], [24, "08:47", 0.6, "02:42", 2.8],
-            [25, "09:23", 0.5, "03:18", 3.0], [26, "09:59", 0.5, "03:56", 3.0], [27, "22:59", 0.4, "16:38", 3.1],
-            [28, "23:37", 0.5, "17:09", 3.1], [29, "11:48", 0.5, "17:42", 3.1], [30, "00:16", 0.5, "18:19", 3.0],
+            {d:1,highs:[["07:00",2.7],["19:13",2.71]],lows:[["00:32",0.43],["12:49",0.59]]},
+            {d:2,highs:[["07:42",2.57],["19:56",2.6]],lows:[["01:13",0.5],["13:30",0.71]]},
+            {d:3,highs:[["08:31",2.41],["20:46",2.45]],lows:[["02:00",0.63],["14:17",0.87]]},
+            {d:4,highs:[["09:31",2.23],["21:52",2.3]],lows:[["02:57",0.79],["15:18",1.05]]},
+            {d:5,highs:[["10:52",2.1],["23:19",2.2]],lows:[["04:11",0.94],["16:42",1.16]]},
+            {d:6,highs:[["12:29",2.1]],lows:[["05:44",0.98],["18:20",1.15]]},
+            {d:7,highs:[["00:54",2.24],["13:49",2.22]],lows:[["07:11",0.91],["19:40",1.0]]},
+            {d:8,highs:[["02:09",2.37],["14:48",2.38]],lows:[["08:16",0.77],["20:38",0.82]]},
+            {d:9,highs:[["03:05",2.53],["15:33",2.54]],lows:[["09:06",0.64],["21:24",0.64]]},
+            {d:10,highs:[["03:51",2.66],["16:12",2.66]],lows:[["09:47",0.54],["22:04",0.51]]},
+            {d:11,highs:[["04:30",2.75],["16:47",2.75]],lows:[["10:23",0.48],["22:40",0.43]]},
+            {d:12,highs:[["05:06",2.78],["17:19",2.78]],lows:[["10:57",0.48],["23:13",0.4]]},
+            {d:13,highs:[["05:39",2.76],["17:51",2.77]],lows:[["11:28",0.51],["23:46",0.42]]},
+            {d:14,highs:[["06:12",2.7],["18:21",2.72]],lows:[["11:59",0.58]]},
+            {d:15,highs:[["06:44",2.6],["18:53",2.62]],lows:[["00:19",0.5],["12:30",0.68]]},
+            {d:16,highs:[["07:18",2.46],["19:27",2.49]],lows:[["00:52",0.61],["13:04",0.81]]},
+            {d:17,highs:[["07:56",2.31],["20:06",2.34]],lows:[["01:29",0.75],["13:41",0.96]]},
+            {d:18,highs:[["08:41",2.14],["20:56",2.17]],lows:[["02:12",0.91],["14:26",1.12]]},
+            {d:19,highs:[["09:44",2.0],["22:07",2.04]],lows:[["03:08",1.07],["15:32",1.26]]},
+            {d:20,highs:[["11:17",1.93],["23:46",2.0]],lows:[["04:30",1.18],["17:10",1.32]]},
+            {d:21,highs:[["12:51",2.0]],lows:[["06:08",1.16],["18:43",1.23]]},
+            {d:22,highs:[["01:12",2.1],["13:55",2.15]],lows:[["07:20",1.04],["19:45",1.06]]},
+            {d:23,highs:[["02:10",2.26],["14:40",2.33]],lows:[["08:11",0.88],["20:30",0.87]]},
+            {d:24,highs:[["02:55",2.44],["15:17",2.49]],lows:[["08:51",0.73],["21:08",0.68]]},
+            {d:25,highs:[["03:33",2.6],["15:51",2.65]],lows:[["09:27",0.59],["21:43",0.52]]},
+            {d:26,highs:[["04:09",2.72],["16:23",2.77]],lows:[["10:00",0.5],["22:18",0.39]]},
+            {d:27,highs:[["04:44",2.8],["16:57",2.85]],lows:[["10:34",0.45],["22:53",0.32]]},
+            {d:28,highs:[["05:19",2.82],["17:31",2.87]],lows:[["11:08",0.44],["23:29",0.3]]},
+            {d:29,highs:[["05:56",2.78],["18:07",2.84]],lows:[["11:43",0.5]]},
+            {d:30,highs:[["06:36",2.68],["18:46",2.74]],lows:[["00:08",0.36],["12:22",0.61]]}
         ] },
     October: { idx: 9, days: [
-            [1, "01:01", 0.7, "19:03", 2.9], [2, "01:57", 0.9, "19:59", 2.7], [3, "03:15", 1.0, "21:17", 2.5],
-            [4, "04:52", 1.0, "23:01", 2.5], [5, "06:06", 1.0, "12:47", 2.5], [6, "07:04", 0.8, "13:40", 2.7],
-            [7, "20:03", 0.7, "14:24", 2.9], [8, "20:50", 0.5, "15:04", 3.0], [9, "21:34", 0.4, "15:41", 3.1],
-            [10, "22:15", 0.4, "16:16", 3.1], [11, "22:55", 0.4, "16:49", 3.1], [12, "23:32", 0.5, "17:19", 3.0],
-            [13, "11:35", 0.8, "17:44", 2.9], [14, "00:07", 0.6, "18:11", 2.8], [15, "00:44", 0.8, "18:46", 2.6],
-            [16, "01:26", 0.9, "19:30", 2.5], [17, "02:17", 1.1, "20:36", 2.3], [18, "03:25", 1.2, "22:15", 2.2],
-            [19, "04:49", 1.2, "23:42", 2.3], [20, "05:58", 1.1, "12:16", 2.3], [21, "06:49", 1.0, "13:04", 2.5],
-            [22, "07:31", 0.9, "13:43", 2.7], [23, "08:09", 0.8, "14:20", 2.8], [24, "21:17", 0.6, "14:56", 3.0],
-            [25, "21:58", 0.5, "15:31", 3.1], [26, "22:39", 0.4, "16:07", 3.1], [27, "23:21", 0.4, "16:44", 3.2],
-            [28, "11:29", 0.6, "17:24", 3.1], [29, "00:05", 0.5, "18:08", 3.0], [30, "00:53", 0.6, "18:58", 2.9],
-            [31, "01:49", 0.8, "19:58", 2.7],
+            {d:1,highs:[["07:19",2.52],["19:31",2.58]],lows:[["00:50",0.48],["13:04",0.77]]},
+            {d:2,highs:[["08:11",2.33],["20:25",2.4]],lows:[["01:39",0.66],["13:55",0.96]]},
+            {d:3,highs:[["09:18",2.15],["21:39",2.22]],lows:[["02:41",0.85],["15:04",1.14]]},
+            {d:4,highs:[["10:50",2.05],["23:18",2.15]],lows:[["04:03",1.0],["16:42",1.22]]},
+            {d:5,highs:[["12:27",2.11]],lows:[["05:41",1.01],["18:20",1.13]]},
+            {d:6,highs:[["00:51",2.22],["13:37",2.26]],lows:[["07:01",0.91],["19:30",0.95]]},
+            {d:7,highs:[["01:57",2.37],["14:27",2.44]],lows:[["07:58",0.78],["20:21",0.76]]},
+            {d:8,highs:[["02:47",2.52],["15:08",2.58]],lows:[["08:42",0.67],["21:02",0.6]]},
+            {d:9,highs:[["03:28",2.63],["15:43",2.69]],lows:[["09:19",0.59],["21:38",0.48]]},
+            {d:10,highs:[["04:04",2.7],["16:15",2.76]],lows:[["09:52",0.54],["22:11",0.42]]},
+            {d:11,highs:[["04:36",2.72],["16:46",2.79]],lows:[["10:23",0.53],["22:42",0.4]]},
+            {d:12,highs:[["05:08",2.69],["17:15",2.77]],lows:[["10:53",0.56],["23:13",0.44]]},
+            {d:13,highs:[["05:39",2.64],["17:45",2.71]],lows:[["11:23",0.62],["23:45",0.51]]},
+            {d:14,highs:[["06:10",2.54],["18:17",2.62]],lows:[["11:54",0.72]]},
+            {d:15,highs:[["06:44",2.42],["18:51",2.49]],lows:[["00:18",0.62],["12:27",0.84]]},
+            {d:16,highs:[["07:22",2.28],["19:31",2.34]],lows:[["00:55",0.76],["13:05",0.98]]},
+            {d:17,highs:[["08:09",2.13],["20:22",2.18]],lows:[["01:39",0.91],["13:53",1.13]]},
+            {d:18,highs:[["09:14",2.01],["21:36",2.05]],lows:[["02:37",1.06],["15:02",1.26]]},
+            {d:19,highs:[["10:44",1.97],["23:11",2.03]],lows:[["03:58",1.15],["16:37",1.29]]},
+            {d:20,highs:[["12:11",2.05]],lows:[["05:28",1.13],["18:05",1.19]]},
+            {d:21,highs:[["00:34",2.13],["13:13",2.2]],lows:[["06:39",1.01],["19:07",1.01]]},
+            {d:22,highs:[["01:33",2.29],["14:00",2.38]],lows:[["07:31",0.86],["19:54",0.81]]},
+            {d:23,highs:[["02:19",2.46],["14:39",2.56]],lows:[["08:13",0.72],["20:34",0.62]]},
+            {d:24,highs:[["03:00",2.61],["15:15",2.71]],lows:[["08:51",0.59],["21:12",0.45]]},
+            {d:25,highs:[["03:39",2.72],["15:51",2.83]],lows:[["09:28",0.51],["21:50",0.34]]},
+            {d:26,highs:[["04:17",2.78],["16:28",2.89]],lows:[["10:04",0.47],["22:28",0.28]]},
+            {d:27,highs:[["04:55",2.78],["17:06",2.9]],lows:[["10:42",0.48],["23:08",0.3]]},
+            {d:28,highs:[["05:36",2.72],["17:45",2.84]],lows:[["11:20",0.55],["23:50",0.38]]},
+            {d:29,highs:[["06:19",2.61],["18:29",2.72]],lows:[["12:03",0.67]]},
+            {d:30,highs:[["07:07",2.45],["19:18",2.55]],lows:[["00:36",0.52],["12:50",0.83]]},
+            {d:31,highs:[["08:03",2.29],["20:18",2.36]],lows:[["01:30",0.69],["13:48",1.0]]}
         ] },
     November: { idx: 10, days: [
-            [1, "03:01", 1.0, "21:16", 2.6], [2, "04:23", 1.0, "22:47", 2.5], [3, "05:35", 1.0, "12:19", 2.6],
-            [4, "18:49", 0.9, "13:10", 2.8], [5, "19:41", 0.7, "13:53", 2.9], [6, "20:28", 0.6, "14:32", 2.9],
-            [7, "21:13", 0.6, "15:09", 3.0], [8, "21:54", 0.5, "15:44", 3.0], [9, "22:34", 0.5, "16:18", 2.9],
-            [10, "23:11", 0.6, "16:47", 2.9], [11, "23:46", 0.6, "17:16", 2.8], [12, "11:41", 1.0, "17:50", 2.7],
-            [13, "00:23", 0.8, "18:29", 2.6], [14, "01:02", 0.9, "19:15", 2.5], [15, "01:46", 1.0, "20:12", 2.4],
-            [16, "02:37", 1.1, "21:22", 2.4], [17, "03:36", 1.2, "22:37", 2.4], [18, "04:39", 1.2, "23:44", 2.4],
-            [19, "05:40", 1.1, "12:09", 2.5], [20, "19:09", 1.0, "12:54", 2.6], [21, "19:59", 0.8, "13:36", 2.8],
-            [22, "20:47", 0.6, "14:16", 2.9], [23, "21:35", 0.5, "14:57", 3.0], [24, "22:22", 0.4, "15:39", 3.1],
-            [25, "23:08", 0.4, "16:23", 3.1], [26, "23:55", 0.4, "17:10", 3.1], [27, "12:04", 0.7, "17:59", 3.1],
-            [28, "00:42", 0.5, "18:52", 2.9], [29, "01:33", 0.7, "19:53", 2.8], [30, "02:31", 0.9, "21:01", 2.6],
+            {d:1,highs:[["09:15",2.15],["21:36",2.22]],lows:[["02:35",0.87],["15:03",1.13]]},
+            {d:2,highs:[["10:41",2.11],["23:08",2.17]],lows:[["03:57",0.98],["16:35",1.16]]},
+            {d:3,highs:[["12:03",2.17]],lows:[["05:22",0.99],["18:00",1.06]]},
+            {d:4,highs:[["00:29",2.24],["13:06",2.3]],lows:[["06:32",0.92],["19:03",0.91]]},
+            {d:5,highs:[["01:30",2.35],["13:54",2.44]],lows:[["07:26",0.83],["19:52",0.76]]},
+            {d:6,highs:[["02:18",2.45],["14:35",2.55]],lows:[["08:09",0.75],["20:32",0.63]]},
+            {d:7,highs:[["02:58",2.53],["15:10",2.64]],lows:[["08:46",0.69],["21:08",0.55]]},
+            {d:8,highs:[["03:34",2.57],["15:43",2.69]],lows:[["09:19",0.66],["21:42",0.5]]},
+            {d:9,highs:[["04:07",2.59],["16:14",2.71]],lows:[["09:51",0.65],["22:14",0.49]]},
+            {d:10,highs:[["04:39",2.57],["16:46",2.7]],lows:[["10:22",0.67],["22:46",0.52]]},
+            {d:11,highs:[["05:11",2.53],["17:18",2.65]],lows:[["10:54",0.71],["23:20",0.58]]},
+            {d:12,highs:[["05:45",2.46],["17:52",2.58]],lows:[["11:27",0.78],["23:55",0.66]]},
+            {d:13,highs:[["06:21",2.37],["18:30",2.47]],lows:[["12:04",0.87]]},
+            {d:14,highs:[["07:02",2.28],["19:12",2.36]],lows:[["00:35",0.77],["12:45",0.98]]},
+            {d:15,highs:[["07:51",2.18],["20:05",2.24]],lows:[["01:20",0.88],["13:36",1.08]]},
+            {d:16,highs:[["08:51",2.1],["21:10",2.15]],lows:[["02:16",0.98],["14:39",1.16]]},
+            {d:17,highs:[["10:02",2.08],["22:27",2.13]],lows:[["03:23",1.05],["15:56",1.17]]},
+            {d:18,highs:[["11:15",2.13],["23:41",2.19]],lows:[["04:37",1.05],["17:12",1.09]]},
+            {d:19,highs:[["12:18",2.25]],lows:[["05:44",0.98],["18:16",0.95]]},
+            {d:20,highs:[["00:44",2.3],["13:11",2.4]],lows:[["06:41",0.87],["19:10",0.78]]},
+            {d:21,highs:[["01:37",2.43],["13:57",2.56]],lows:[["07:29",0.76],["19:57",0.62]]},
+            {d:22,highs:[["02:25",2.55],["14:41",2.69]],lows:[["08:14",0.66],["20:42",0.48]]},
+            {d:23,highs:[["03:10",2.63],["15:23",2.8]],lows:[["08:57",0.59],["21:26",0.38]]},
+            {d:24,highs:[["03:54",2.68],["16:05",2.85]],lows:[["09:40",0.56],["22:10",0.34]]},
+            {d:25,highs:[["04:38",2.68],["16:49",2.85]],lows:[["10:23",0.57],["22:54",0.35]]},
+            {d:26,highs:[["05:23",2.64],["17:34",2.8]],lows:[["11:07",0.62],["23:41",0.43]]},
+            {d:27,highs:[["06:11",2.55],["18:23",2.69]],lows:[["11:55",0.71]]},
+            {d:28,highs:[["07:02",2.45],["19:16",2.56]],lows:[["00:31",0.54],["12:47",0.82]]},
+            {d:29,highs:[["07:58",2.34],["20:16",2.41]],lows:[["01:26",0.68],["13:46",0.93]]},
+            {d:30,highs:[["09:02",2.26],["21:24",2.3]],lows:[["02:27",0.81],["14:53",1.01]]}
         ] },
     December: { idx: 11, days: [
-            [1, "03:35", 1.0, "10:29", 2.6], [2, "17:18", 1.0, "11:34", 2.6], [3, "18:19", 0.9, "12:31", 2.7],
-            [4, "19:14", 0.8, "13:18", 2.7], [5, "20:04", 0.8, "14:00", 2.8], [6, "20:50", 0.7, "14:39", 2.8],
-            [7, "21:34", 0.7, "15:17", 2.8], [8, "22:14", 0.6, "15:52", 2.8], [9, "22:52", 0.6, "16:25", 2.8],
-            [10, "23:29", 0.7, "16:58", 2.8], [11, "11:27", 1.0, "17:34", 2.8], [12, "00:04", 0.7, "18:14", 2.7],
-            [13, "00:40", 0.8, "18:56", 2.7], [14, "01:17", 0.9, "19:41", 2.6], [15, "01:55", 1.0, "20:33", 2.5],
-            [16, "02:38", 1.1, "21:34", 2.4], [17, "03:27", 1.1, "10:00", 2.4], [18, "17:14", 1.2, "11:02", 2.4],
-            [19, "18:20", 1.0, "11:58", 2.6], [20, "19:23", 0.9, "12:49", 2.7], [21, "20:21", 0.7, "13:39", 2.8],
-            [22, "21:15", 0.6, "14:28", 3.0], [23, "22:06", 0.4, "15:18", 3.1], [24, "22:54", 0.4, "16:08", 3.1],
-            [25, "23:39", 0.4, "16:59", 3.2], [26, "11:51", 0.6, "17:49", 3.1], [27, "00:24", 0.5, "18:40", 3.0],
-            [28, "01:09", 0.6, "19:34", 2.9], [29, "01:55", 0.8, "20:31", 2.7], [30, "15:33", 1.0, "09:35", 2.6],
-            [31, "16:38", 1.0, "10:35", 2.5],
-        ] },
+            {d:1,highs:[["10:10",2.22],["22:37",2.24]],lows:[["03:34",0.91],["16:06",1.03]]},
+            {d:2,highs:[["11:18",2.23],["23:48",2.23]],lows:[["04:43",0.96],["17:18",1.0]]},
+            {d:3,highs:[["12:19",2.29]],lows:[["05:46",0.96],["18:20",0.92]]},
+            {d:4,highs:[["00:49",2.27],["13:11",2.37]],lows:[["06:42",0.93],["19:13",0.84]]},
+            {d:5,highs:[["01:41",2.32],["13:56",2.44]],lows:[["07:29",0.89],["19:59",0.76]]},
+            {d:6,highs:[["02:25",2.37],["14:37",2.5]],lows:[["08:11",0.85],["20:39",0.69]]},
+            {d:7,highs:[["03:05",2.4],["15:15",2.55]],lows:[["08:49",0.82],["21:17",0.66]]},
+            {d:8,highs:[["03:43",2.42],["15:51",2.58]],lows:[["09:26",0.8],["21:53",0.63]]},
+            {d:9,highs:[["04:19",2.43],["16:26",2.58]],lows:[["10:02",0.79],["22:29",0.63]]},
+            {d:10,highs:[["04:55",2.43],["17:03",2.57]],lows:[["10:37",0.8],["23:05",0.65]]},
+            {d:11,highs:[["05:31",2.41],["17:40",2.55]],lows:[["11:14",0.82],["23:43",0.68]]},
+            {d:12,highs:[["06:09",2.38],["18:19",2.5]],lows:[["11:53",0.85]]},
+            {d:13,highs:[["06:50",2.34],["19:02",2.44]],lows:[["00:23",0.73],["12:35",0.89]]},
+            {d:14,highs:[["07:34",2.3],["19:49",2.38]],lows:[["01:06",0.79],["13:21",0.94]]},
+            {d:15,highs:[["08:23",2.27],["20:42",2.32]],lows:[["01:53",0.85],["14:13",0.97]]},
+            {d:16,highs:[["09:18",2.25],["21:42",2.28]],lows:[["02:46",0.9],["15:12",0.98]]},
+            {d:17,highs:[["10:17",2.26],["22:46",2.26]],lows:[["03:44",0.93],["16:15",0.96]]},
+            {d:18,highs:[["11:18",2.31],["23:51",2.29]],lows:[["04:45",0.94],["17:21",0.9]]},
+            {d:19,highs:[["12:18",2.39]],lows:[["05:46",0.91],["18:24",0.8]]},
+            {d:20,highs:[["00:54",2.34],["13:16",2.49]],lows:[["06:45",0.86],["19:22",0.69]]},
+            {d:21,highs:[["01:53",2.42],["14:10",2.59]],lows:[["07:41",0.8],["20:17",0.58]]},
+            {d:22,highs:[["02:48",2.49],["15:02",2.69]],lows:[["08:34",0.73],["21:10",0.49]]},
+            {d:23,highs:[["03:39",2.55],["15:53",2.76]],lows:[["09:25",0.68],["22:00",0.43]]},
+            {d:24,highs:[["04:29",2.59],["16:42",2.79]],lows:[["10:14",0.64],["22:49",0.42]]},
+            {d:25,highs:[["05:18",2.6],["17:31",2.77]],lows:[["11:03",0.63],["23:37",0.44]]},
+            {d:26,highs:[["06:06",2.58],["18:20",2.72]],lows:[["11:53",0.65]]},
+            {d:27,highs:[["06:54",2.55],["19:10",2.64]],lows:[["00:25",0.51],["12:42",0.69]]},
+            {d:28,highs:[["07:43",2.48],["20:02",2.53]],lows:[["01:14",0.6],["13:33",0.76]]},
+            {d:29,highs:[["08:33",2.41],["20:55",2.41]],lows:[["02:04",0.71],["14:26",0.83]]},
+            {d:30,highs:[["09:26",2.34],["21:52",2.3]],lows:[["02:55",0.83],["15:23",0.9]]},
+            {d:31,highs:[["10:21",2.29],["22:48",2.22]],lows:[["03:50",0.94],["16:23",0.95]]}
+        ] }
 };
 const MONTHS = Object.entries(RAW).map(([name, { idx, days }]) => ({
     name,
     idx,
-    days: days.map(([d, lt, lh, ht, hh]) => ({
-        d, lowT: lt, lowH: lh, highT: ht, highH: hh, range: +(hh - lh).toFixed(1),
-    })),
+    days: days.map(({ d, highs, lows }) => {
+        const events = [
+            ...highs.map(([t, h]) => ({ type: "H", t, h })),
+            ...lows.map(([t, h]) => ({ type: "L", t, h })),
+        ].sort((a, b) => a.t.localeCompare(b.t));
+        const highH = Math.max(...highs.map((p) => p[1]));
+        const lowH = Math.min(...lows.map((p) => p[1]));
+        const highT = highs.find((p) => p[1] === highH)[0];
+        const lowT = lows.find((p) => p[1] === lowH)[0];
+        return { d, highs, lows, events, highH, lowH, highT, lowT, range: +(highH - lowH).toFixed(2) };
+    }),
 }));
+const MONTH_LEN = MONTHS.map((m) => m.days.length);
+const OFFSET = (() => { const o = []; let a = 0; for (const L of MONTH_LEN) { o.push(a); a += L; } return o; })();
+const TOTAL_DAYS = OFFSET[OFFSET.length - 1] + MONTH_LEN[MONTH_LEN.length - 1];
+function mdToGdi(mi, d) { return OFFSET[mi] + (d - 1); }
+function gdiToMD(gdi) { let mi = 0; while (mi + 1 < OFFSET.length && gdi >= OFFSET[mi + 1]) mi++; return { mi, d: gdi - OFFSET[mi] + 1 }; }
+function gdiLabel(gdi) { const md = gdiToMD(gdi); return MONTHS[md.mi].name.slice(0, 3) + " " + md.d; }
+function gdiToDate(gdi) { const dt = new Date(2026, 6, 1 + gdi); const z = (n) => String(n).padStart(2, "0"); return dt.getFullYear() + "-" + z(dt.getMonth() + 1) + "-" + z(dt.getDate()); }
+function dateToGdi(s) { const p = s.split("-").map(Number); const dt = new Date(p[0], p[1] - 1, p[2]); const base = new Date(2026, 6, 1); return Math.max(0, Math.min(TOTAL_DAYS - 1, Math.round((dt - base) / 86400000))); }
+const GEVENTS = (() => {
+    const out = [];
+    MONTHS.forEach((m, mi) => m.days.forEach((r) => r.events.forEach((e) => {
+        const p = e.t.split(":");
+        out.push({ gMin: mdToGdi(mi, r.d) * 1440 + (+p[0]) * 60 + (+p[1]), h: e.h, type: e.type, gdi: mdToGdi(mi, r.d) });
+    })));
+    out.sort((a, b) => a.gMin - b.gMin);
+    return out;
+})();
+function levelAtGlobal(min) {
+    const ev = GEVENTS;
+    if (min <= ev[0].gMin) return ev[0].h;
+    if (min >= ev[ev.length - 1].gMin) return ev[ev.length - 1].h;
+    let i = 1; while (i < ev.length && ev[i].gMin < min) i++;
+    const a = ev[i - 1], b = ev[i];
+    const f = (min - a.gMin) / ((b.gMin - a.gMin) || 1);
+    return (a.h + b.h) / 2 + ((a.h - b.h) / 2) * Math.cos(Math.PI * f);
+}
 const WD = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const WD_LONG = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+// Unit conversion (metres ⇄ feet)
+const M2FT = 3.28084;
+function conv(h, unit) { return unit === "m" ? h : +(h * M2FT).toFixed(1); }
+function uLabel(unit) { return unit === "m" ? "m" : "ft"; }
 // Tidal range classification
 function tideClass(range) {
-    if (range >= 2.4)
+    if (range >= 2.1)
         return { label: "Spring tide", note: "large range", color: C.spring };
-    if (range >= 1.6)
+    if (range >= 1.4)
         return { label: "Medium tide", note: "moderate range", color: C.high };
     return { label: "Neap tide", note: "small range", color: C.low };
 }
@@ -139,41 +298,79 @@ function rangeColor(range, min, max) {
     return `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
 }
 /* ── Tide ribbon chart (the dashboard signature) ─────────────── */
-function TideRibbon({ month, selectedDay, onPick }) {
-    const W = 820, H = 280, padL = 38, padR = 14, padT = 18, padB = 30;
+function TideRibbon({ winStart, winLen, selectedGdi, onPickGlobal, unit }) {
+    const W = 820, H = 280, padL = 38, padR = 14, padT = 30, padB = 30;
     const plotW = W - padL - padR, plotH = H - padT - padB;
-    const N = month.days.length;
-    const hMin = 0, hMax = 3.4;
-    const x = (d) => padL + ((d - 1) / (N - 1)) * plotW;
-    const y = (h) => padT + (1 - (h - hMin) / (hMax - hMin)) * plotH;
-    const highPts = month.days.map((r) => [x(r.d), y(r.highH)]);
-    const lowPts = month.days.map((r) => [x(r.d), y(r.lowH)]);
-    const toPath = (pts) => pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
-    const band = toPath(highPts) +
-        " " + lowPts.slice().reverse().map((p) => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ") +
-        " Z";
+    const hMin = 0, hMax = 3.0;
+    const startMin = winStart * 1440, totalMin = winLen * 1440, endMin = startMin + totalMin;
+    const ftLabel = (v) => (unit === "m" ? v + "m" : (v * 3.28084).toFixed(1) + "ft");
+    const cvh = (h) => (unit === "m" ? h : h * 3.28084);
+    const ul = unit === "m" ? "m" : "ft";
+    const xOf = (gmin) => padL + ((gmin - startMin) / totalMin) * plotW;
+    const yOf = (h) => padT + (1 - (h - hMin) / (hMax - hMin)) * plotH;
+    const paths = useMemo(() => {
+        const pts = [];
+        for (let px = padL; px <= W - padR; px++) {
+            const gmin = startMin + ((px - padL) / plotW) * totalMin;
+            pts.push(px.toFixed(1) + "," + yOf(levelAtGlobal(gmin)).toFixed(1));
+        }
+        const line = "M" + pts.join(" L");
+        const area = line + " L" + (W - padR).toFixed(1) + "," + yOf(hMin).toFixed(1) + " L" + padL.toFixed(1) + "," + yOf(hMin).toFixed(1) + " Z";
+        return { line, area };
+    }, [winStart, winLen]);
     const yticks = [0, 1, 2, 3];
-    const xticks = month.days.filter((r) => r.d === 1 || r.d % 5 === 0);
-    const sel = month.days.find((r) => r.d === selectedDay);
-    return (React.createElement("svg", { viewBox: `0 0 ${W} ${H}`, width: "100%", style: { display: "block", touchAction: "manipulation" } },
+    const step = winLen <= 8 ? 1 : (winLen <= 18 ? 2 : 5);
+    const xticks = [];
+    for (let g = winStart; g < winStart + winLen; g++) {
+        const md = gdiToMD(g);
+        if ((g - winStart) % step === 0 || md.d === 1) xticks.push({ g, label: md.d === 1 ? MONTHS[md.mi].name.slice(0, 3) + " 1" : String(md.d) });
+    }
+    const selIn = selectedGdi >= winStart && selectedGdi < winStart + winLen;
+    const selEvents = GEVENTS.filter((e) => e.gdi === selectedGdi && e.gMin >= startMin && e.gMin < endMin);
+    const svgRef = React.useRef(null);
+    const [probe, setProbe] = useState(null);
+    const handle = (e, pick) => {
+        const svg = svgRef.current; if (!svg) return;
+        const rect = svg.getBoundingClientRect();
+        let px = ((e.clientX - rect.left) / rect.width) * W;
+        px = Math.max(padL, Math.min(W - padR, px));
+        const gmin = startMin + ((px - padL) / plotW) * totalMin;
+        const h = levelAtGlobal(gmin);
+        const h2 = levelAtGlobal(Math.min(endMin, gmin + 8));
+        const gdi = Math.min(TOTAL_DAYS - 1, Math.floor(gmin / 1440));
+        const mid = Math.round(gmin) % 1440;
+        const hh = String(Math.floor(mid / 60)).padStart(2, "0");
+        const mm = String(mid % 60).padStart(2, "0");
+        const trend = Math.abs(h2 - h) < 0.004 ? "slack" : (h2 > h ? "rising" : "falling");
+        setProbe({ px, y: yOf(h), gdi, time: hh + ":" + mm, h, trend });
+        if (pick) onPickGlobal(gdi);
+    };
+    const tip = probe ? (() => { const bw = 152, bh = 50; const tx = Math.max(padL, Math.min(W - padR - bw, probe.px - bw / 2)); return { tx, ty: padT - 6, bw, bh }; })() : null;
+    return (React.createElement("svg", { ref: svgRef, viewBox: `0 0 ${W} ${H}`, width: "100%",
+            style: { display: "block", touchAction: "pan-y", cursor: "crosshair" },
+            onPointerDown: (e) => handle(e, true),
+            onPointerMove: (e) => handle(e, e.buttons === 1),
+            onPointerLeave: () => setProbe(null) },
         React.createElement("defs", null,
-            React.createElement("linearGradient", { id: "bandGrad", x1: "0", y1: "0", x2: "0", y2: "1" },
-                React.createElement("stop", { offset: "0%", stopColor: C.high, stopOpacity: "0.30" }),
-                React.createElement("stop", { offset: "100%", stopColor: C.low, stopOpacity: "0.30" }))),
-        yticks.map((t) => (React.createElement("g", { key: t },
-            React.createElement("line", { x1: padL, y1: y(t), x2: W - padR, y2: y(t), stroke: C.edge, strokeWidth: "1", strokeDasharray: "2 4" }),
-            React.createElement("text", { x: padL - 8, y: y(t) + 4, textAnchor: "end", fontSize: "11", fill: C.faint },
-                t,
-                "m")))),
-        React.createElement("path", { d: band, fill: "url(#bandGrad)", stroke: "none" }),
-        React.createElement("path", { d: toPath(highPts), fill: "none", stroke: C.high, strokeWidth: "2" }),
-        React.createElement("path", { d: toPath(lowPts), fill: "none", stroke: C.low, strokeWidth: "2" }),
-        sel && (React.createElement("g", null,
-            React.createElement("line", { x1: x(sel.d), y1: padT, x2: x(sel.d), y2: H - padB, stroke: C.ink, strokeOpacity: "0.5", strokeWidth: "1" }),
-            React.createElement("circle", { cx: x(sel.d), cy: y(sel.highH), r: "5", fill: C.high, stroke: C.abyss, strokeWidth: "1.5" }),
-            React.createElement("circle", { cx: x(sel.d), cy: y(sel.lowH), r: "5", fill: C.low, stroke: C.abyss, strokeWidth: "1.5" }))),
-        xticks.map((r) => (React.createElement("text", { key: r.d, x: x(r.d), y: H - padB + 18, textAnchor: "middle", fontSize: "11", fill: C.faint }, r.d))),
-        month.days.map((r) => (React.createElement("rect", { key: r.d, x: x(r.d) - plotW / N / 2, y: padT, width: plotW / N, height: plotH, fill: "transparent", style: { cursor: "pointer" }, onClick: () => onPick(r.d) })))));
+            React.createElement("linearGradient", { id: "tideFill", x1: "0", y1: "0", x2: "0", y2: "1" },
+                React.createElement("stop", { offset: "0%", stopColor: C.high, stopOpacity: "0.40" }),
+                React.createElement("stop", { offset: "100%", stopColor: C.low, stopOpacity: "0.05" }))),
+        React.createElement("rect", { x: 0, y: 0, width: W, height: H, fill: "transparent" }),
+        yticks.map((tk) => (React.createElement("g", { key: tk },
+            React.createElement("line", { x1: padL, y1: yOf(tk), x2: W - padR, y2: yOf(tk), stroke: C.edge, strokeWidth: "1", strokeDasharray: "2 4" }),
+            React.createElement("text", { x: padL - 8, y: yOf(tk) + 4, textAnchor: "end", fontSize: "11", fill: C.faint }, ftLabel(tk))))),
+        selIn && React.createElement("rect", { x: xOf(selectedGdi * 1440), y: padT, width: Math.max(0, xOf((selectedGdi + 1) * 1440) - xOf(selectedGdi * 1440)), height: plotH, fill: C.ink, opacity: 0.06 }),
+        React.createElement("path", { d: paths.area, fill: "url(#tideFill)", stroke: "none" }),
+        React.createElement("path", { d: paths.line, fill: "none", stroke: C.high, strokeWidth: "1.8" }),
+        selEvents.map((e, i) => (React.createElement("circle", { key: i, cx: xOf(e.gMin), cy: yOf(e.h), r: "4", fill: e.type === "H" ? C.high : C.low, stroke: C.abyss, strokeWidth: "1.5" }))),
+        xticks.map((tk) => (React.createElement("text", { key: tk.g, x: xOf(tk.g * 1440 + 720), y: H - padB + 18, textAnchor: "middle", fontSize: "11", fill: C.faint }, tk.label))),
+        probe && (React.createElement("g", { style: { pointerEvents: "none" } },
+            React.createElement("line", { x1: probe.px, y1: padT, x2: probe.px, y2: H - padB, stroke: C.ink, strokeOpacity: "0.55", strokeWidth: "1" }),
+            React.createElement("circle", { cx: probe.px, cy: probe.y, r: "5", fill: "#FFFFFF", stroke: C.high, strokeWidth: "2" }),
+            React.createElement("rect", { x: tip.tx, y: tip.ty, width: tip.bw, height: tip.bh, rx: 8, fill: C.panelAlt, stroke: C.edge }),
+            React.createElement("text", { x: tip.tx + 11, y: tip.ty + 19, fontSize: "12", fill: C.muted }, gdiLabel(probe.gdi) + " \u00b7 " + probe.time),
+            React.createElement("text", { x: tip.tx + 11, y: tip.ty + 39, fontSize: "16", fontWeight: "700", fill: C.ink }, "\u2248 " + cvh(probe.h).toFixed(2) + " " + ul),
+            React.createElement("text", { x: tip.tx + tip.bw - 11, y: tip.ty + 39, textAnchor: "end", fontSize: "11", fill: probe.trend === "rising" ? C.high : (probe.trend === "falling" ? C.low : C.muted) }, probe.trend)))));
 }
 function App() {
     const [mi, setMi] = useState(0);
@@ -183,13 +380,37 @@ function App() {
         return month.days.reduce((a, b) => (b.highH > a.highH ? b : a)).d;
     }, [mi]);
     const [day, setDay] = useState(defaultDay);
+    // ── Curve range window (global day index across Jul–Dec) ──
+    const [winStart, setWinStart] = useState(OFFSET[0]);
+    const [winLen, setWinLen] = useState(MONTH_LEN[0]);
+    const [rangeMode, setRangeMode] = useState("month");
+    const selectedGdi = mdToGdi(mi, day);
+    // ── Units (metres / feet) ───────────────────────────────────
+    const [unit, setUnit] = useState("m");
+    const cv = (h) => conv(h, unit);
+    const ul = uLabel(unit);
     // when the month changes, relocate the selected day
     const onMonth = (i) => {
         setMi(i);
         const m = MONTHS[i];
         const dd = m.days.reduce((a, b) => (b.highH > a.highH ? b : a)).d;
         setDay(dd);
+        setWinStart(OFFSET[i]); setWinLen(MONTH_LEN[i]); setRangeMode("month");
     };
+    const pickGlobal = (gdi) => { const md = gdiToMD(gdi); setMi(md.mi); setDay(md.d); };
+    const setPreset = (len, mode) => {
+        if (mode === "month") { setWinStart(OFFSET[mi]); setWinLen(MONTH_LEN[mi]); setRangeMode("month"); return; }
+        const sg = mdToGdi(mi, day);
+        const st = Math.max(0, Math.min(TOTAL_DAYS - len, sg - Math.floor(len / 2)));
+        setWinStart(st); setWinLen(len); setRangeMode(mode);
+    };
+    const shiftWin = (dir) => {
+        const st = Math.max(0, Math.min(TOTAL_DAYS - winLen, winStart + dir * winLen));
+        setWinStart(st);
+        setRangeMode(winLen === 3 ? "3" : winLen === 7 ? "7" : winLen === 14 ? "14" : "custom");
+    };
+    const setFrom = (iso) => { const f = dateToGdi(iso); const end = winStart + winLen - 1; const ss = Math.min(f, end); setWinStart(ss); setWinLen(end - ss + 1); setRangeMode("custom"); };
+    const setTo = (iso) => { const tg = dateToGdi(iso); const ss = winStart; const ee = Math.max(tg, ss); setWinLen(ee - ss + 1); setRangeMode("custom"); };
     const rec = month.days.find((r) => r.d === day) || month.days[0];
     const cls = tideClass(rec.range);
     // ── Query module state ──────────────────────────────────────
@@ -216,7 +437,7 @@ function App() {
         const lowLow = month.days.reduce((a, b) => (b.lowH < a.lowH ? b : a));
         const biggest = month.days.reduce((a, b) => (b.range > a.range ? b : a));
         const smallest = month.days.reduce((a, b) => (b.range < a.range ? b : a));
-        const springs = month.days.filter((r) => r.range >= 2.4).map((r) => r.d);
+        const springs = month.days.filter((r) => r.range >= 2.1).map((r) => r.d);
         return { minR, maxR, topHigh, lowLow, biggest, smallest, springs };
     }, [mi]);
     const firstWD = (new Date(2026, month.idx, 1).getDay() + 6) % 7; // 0 = Monday
@@ -240,7 +461,12 @@ function App() {
                     React.createElement("div", null,
                         React.createElement("div", { style: { letterSpacing: 2.5, fontSize: 11, color: C.brand, textTransform: "uppercase", fontWeight: 700 } }, "Tide intelligence \u00B7 6\u00B050\u2032N 58\u00B010\u2032W Guyana"),
                         React.createElement("h1", { style: { margin: "3px 0 0", fontSize: 28, fontWeight: 700, letterSpacing: -0.5 } }, "Georgetown Tides \u00B7 2026"))),
-                React.createElement("div", { style: { display: "flex", gap: 16, fontSize: 12, color: C.muted } },
+                React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 16, fontSize: 12, color: C.muted } },
+                    React.createElement("div", { style: { display: "flex", border: `1px solid ${C.edge}`, borderRadius: 999, overflow: "hidden" } }, ["m", "ft"].map((u) => (React.createElement("button", { key: u, onClick: () => setUnit(u), style: {
+                            padding: "6px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", border: "none",
+                            background: unit === u ? C.brand : "transparent",
+                            color: unit === u ? "#FFFFFF" : C.ink, transition: "all .15s",
+                        } }, u === "m" ? "Metres" : "Feet")))),
                     React.createElement("span", null,
                         React.createElement("span", { style: { color: C.high, fontWeight: 700 } }, "\u25CF"),
                         " High tide"),
@@ -266,7 +492,7 @@ function App() {
                         Array.from({ length: firstWD }).map((_, i) => React.createElement("div", { key: "e" + i })),
                         month.days.map((r) => {
                             const active = r.d === day;
-                            return (React.createElement("button", { key: r.d, onClick: () => setDay(r.d), title: `${r.d} · high ${r.highH}m / low ${r.lowH}m`, style: {
+                            return (React.createElement("button", { key: r.d, onClick: () => setDay(r.d), title: `${month.name} ${r.d} · highs ${r.highs.map((p) => cv(p[1])).join("/")}${ul} · lows ${r.lows.map((p) => cv(p[1])).join("/")}${ul}`, style: {
                                     aspectRatio: "1 / 1", borderRadius: 9, cursor: "pointer",
                                     border: active ? `2px solid ${C.ink}` : "1px solid rgba(0,0,0,0.25)",
                                     background: rangeColor(r.range, stats.minR, stats.maxR),
@@ -277,7 +503,7 @@ function App() {
                                 } },
                                 React.createElement("span", null, r.d),
                                 React.createElement("span", { style: { fontSize: 9, opacity: 0.9, fontWeight: 600, marginTop: 2 } },
-                                    r.highH,
+                                    cv(r.highH),
                                     "\u2191")));
                         })),
                     React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 12, fontSize: 11, color: C.muted } },
@@ -290,29 +516,28 @@ function App() {
                         month.name,
                         " ",
                         String(rec.d).padStart(2, "0")),
-                    React.createElement("div", { style: { display: "flex", gap: 12, marginTop: 16 } },
-                        React.createElement("div", { style: { flex: 1, background: C.panelAlt, borderRadius: 12, padding: "14px 14px", borderTop: `3px solid ${C.high}` } },
-                            React.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, "High tide"),
-                            React.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: C.high } },
-                                rec.highH,
-                                React.createElement("span", { style: { fontSize: 14, color: C.muted } }, " m")),
-                            React.createElement("div", { style: { fontSize: 14, color: C.ink, marginTop: 2 } },
-                                "at ",
-                                rec.highT)),
-                        React.createElement("div", { style: { flex: 1, background: C.panelAlt, borderRadius: 12, padding: "14px 14px", borderTop: `3px solid ${C.low}` } },
-                            React.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, "Low tide"),
-                            React.createElement("div", { style: { fontSize: 28, fontWeight: 700, color: C.low } },
-                                rec.lowH,
-                                React.createElement("span", { style: { fontSize: 14, color: C.muted } }, " m")),
-                            React.createElement("div", { style: { fontSize: 14, color: C.ink, marginTop: 2 } },
-                                "at ",
-                                rec.lowT))),
+                    React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 14, marginBottom: 8 } },
+                        React.createElement("span", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, "Tides this day"),
+                        React.createElement("span", { style: { fontSize: 11, color: C.faint } }, rec.events.length + " events")),
+                    React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 8 } }, rec.events.map((e, i) => {
+                        const isH = e.type === "H";
+                        return React.createElement("div", { key: i, style: {
+                                display: "flex", alignItems: "center", gap: 12,
+                                background: C.panelAlt, borderRadius: 11, padding: "11px 14px",
+                                borderLeft: `3px solid ${isH ? C.high : C.low}`,
+                            } },
+                            React.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: isH ? C.high : C.low, width: 36 } }, isH ? "High" : "Low"),
+                            React.createElement("span", { style: { fontSize: 15, color: C.ink, width: 58 } }, e.t),
+                            React.createElement("span", { style: { marginLeft: "auto", fontSize: 21, fontWeight: 700, color: isH ? C.high : C.low } },
+                                cv(e.h),
+                                React.createElement("span", { style: { fontSize: 12, color: C.muted, fontWeight: 500 } }, " " + ul)));
+                    })),
                     React.createElement("div", { style: { marginTop: 16, padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: `1px solid ${C.edge}` } },
                         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
                             React.createElement("span", { style: { fontSize: 13, color: C.muted } }, "Range"),
                             React.createElement("span", { style: { fontSize: 20, fontWeight: 700 } },
-                                rec.range,
-                                " m")),
+                                cv(rec.range),
+                                " " + ul)),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8 } },
                             React.createElement("span", { style: { width: 10, height: 10, borderRadius: 3, background: cls.color } }),
                             React.createElement("span", { style: { fontSize: 14, fontWeight: 600, color: cls.color } }, cls.label),
@@ -323,10 +548,20 @@ function App() {
                         React.createElement("button", { onClick: () => setDay(Math.max(1, day - 1)), disabled: day <= 1, style: navBtn(day <= 1) }, "\u2190 Previous day"),
                         React.createElement("button", { onClick: () => setDay(Math.min(month.days.length, day + 1)), disabled: day >= month.days.length, style: navBtn(day >= month.days.length) }, "Next day \u2192")))),
             React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 16, marginTop: 16 }) },
-                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 } },
-                    React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, "Full month \u00B7 high & low tide day by day"),
-                    React.createElement("span", { style: { fontSize: 12, color: C.muted } }, "The band widens at spring tides and narrows at neaps")),
-                React.createElement(TideRibbon, { month: month, selectedDay: day, onPick: setDay })),
+                React.createElement("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 10 } },
+                    React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, "Tide curve \u00B7 two highs & two lows"),
+                    React.createElement("span", { style: { fontSize: 12, color: C.muted } }, gdiLabel(winStart), " \u2013 ", gdiLabel(winStart + winLen - 1), " \u00B7 ", winLen, winLen === 1 ? " day" : " days")),
+                React.createElement("div", { style: { display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 14 } },
+                    React.createElement("div", { style: { display: "flex", gap: 6 } }, [["3", 3, "3 days"], ["7", 7, "1 week"], ["14", 14, "2 weeks"], ["month", "month", "Month"]].map((opt) => (React.createElement("button", { key: opt[0], onClick: () => setPreset(opt[1] === "month" ? 0 : opt[1], opt[0]), style: segBtn(rangeMode === opt[0], C.brand) }, opt[2])))),
+                    React.createElement("div", { style: { display: "flex", gap: 6, marginLeft: "auto", alignItems: "center" } },
+                        React.createElement("label", { style: { fontSize: 11, color: C.muted } }, "From"),
+                        React.createElement("input", { type: "date", min: "2026-07-01", max: "2026-12-31", value: gdiToDate(winStart), onChange: (e) => e.target.value && setFrom(e.target.value), style: dateInput }),
+                        React.createElement("label", { style: { fontSize: 11, color: C.muted } }, "to"),
+                        React.createElement("input", { type: "date", min: "2026-07-01", max: "2026-12-31", value: gdiToDate(winStart + winLen - 1), onChange: (e) => e.target.value && setTo(e.target.value), style: dateInput })),
+                    React.createElement("div", { style: { display: "flex", gap: 6 } },
+                        React.createElement("button", { onClick: () => shiftWin(-1), disabled: winStart <= 0, style: arrowBtn(winStart <= 0) }, "\u25C0"),
+                        React.createElement("button", { onClick: () => shiftWin(1), disabled: winStart + winLen >= TOTAL_DAYS, style: arrowBtn(winStart + winLen >= TOTAL_DAYS) }, "\u25B6"))),
+                React.createElement(TideRibbon, { winStart: winStart, winLen: winLen, selectedGdi: selectedGdi, onPickGlobal: pickGlobal, unit: unit })),
             React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 18, marginTop: 16 }) },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 14 } },
                     React.createElement("h2", { style: { margin: 0, fontSize: 16, fontWeight: 600 } }, "Tide level query"),
@@ -335,13 +570,13 @@ function App() {
                     React.createElement("div", null,
                         React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 12 } }, [["high", "High tide ≥"], ["low", "Low tide ≤"]].map(([k, lbl]) => (React.createElement("button", { key: k, onClick: () => setQTide(k), style: segBtn(qTide === k, k === "high" ? C.high : C.low) }, lbl)))),
                         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 6 } },
-                            React.createElement("input", { type: "number", step: "0.1", min: "0", max: "3.4", value: qLevel, onChange: (e) => setQLevel(Math.max(0, Math.min(3.4, +e.target.value || 0))), style: {
+                            React.createElement("input", { type: "number", step: "0.1", min: "0", max: unit === "m" ? "3.4" : "11.2", value: cv(qLevel), onChange: (e) => { const v = +e.target.value || 0; const m = unit === "m" ? v : v / M2FT; setQLevel(Math.max(0, Math.min(3.4, m))); }, style: {
                                     width: 92, fontSize: 24, fontWeight: 700, textAlign: "center",
                                     background: C.abyss, color: C.ink, border: `1px solid ${C.edge}`,
                                     borderRadius: 10, padding: "8px 6px", fontVariantNumeric: "tabular-nums",
                                 } }),
-                            React.createElement("span", { style: { fontSize: 14, color: C.muted } }, "metres")),
-                        React.createElement("input", { type: "range", min: "0", max: "3.4", step: "0.1", value: qLevel, onChange: (e) => setQLevel(+e.target.value), style: { width: "100%", accentColor: C.brand } }),
+                            React.createElement("span", { style: { fontSize: 14, color: C.muted } }, unit === "m" ? "metres" : "feet")),
+                        React.createElement("input", { type: "range", min: "0", max: unit === "m" ? "3.4" : "11.2", step: "0.1", value: cv(qLevel), onChange: (e) => { const v = +e.target.value; setQLevel(unit === "m" ? v : v / M2FT); }, style: { width: "100%", accentColor: C.brand } }),
                         React.createElement("div", { style: { display: "flex", gap: 8, marginTop: 14 } }, [["all", "All months (Jul–Dec)"], ["month", `${month.name} only`]].map(([k, lbl]) => (React.createElement("button", { key: k, onClick: () => setQScope(k), style: segBtn(qScope === k, C.brand) }, lbl))))),
                     React.createElement("div", { style: { background: C.abyss, border: `1px solid ${C.edge}`, borderRadius: 14, padding: 18, textAlign: "center" } },
                         React.createElement("div", { style: { fontSize: 12, color: C.muted, lineHeight: 1.5 } },
@@ -351,8 +586,8 @@ function App() {
                             React.createElement("b", { style: { color: C.ink } },
                                 qTide === "high" ? "≥" : "≤",
                                 " ",
-                                qLevel.toFixed(1),
-                                " m"),
+                                cv(qLevel).toFixed(1),
+                                " " + ul),
                             React.createElement("br", null),
                             qScope === "all" ? "across Jul–Dec 2026" : `in ${month.name} 2026`),
                         React.createElement("div", { style: { display: "flex", justifyContent: "center", alignItems: "baseline", gap: 18, marginTop: 10 } },
@@ -385,13 +620,13 @@ function App() {
                             " ",
                             r.d,
                             " \u00B7 ",
-                            qTide === "high" ? r.highH : r.lowH,
-                            " m")))))),
+                            qTide === "high" ? cv(r.highH) : cv(r.lowH),
+                            " " + ul)))))),
             React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 } },
-                React.createElement(Insight, { title: "Highest high tide", value: `${stats.topHigh.highH} m`, sub: `Day ${stats.topHigh.d}, ${stats.topHigh.highT}`, color: C.high }),
-                React.createElement(Insight, { title: "Lowest low tide", value: `${stats.lowLow.lowH} m`, sub: `Day ${stats.lowLow.d}, ${stats.lowLow.lowT}`, color: C.low }),
-                React.createElement(Insight, { title: "Largest range", value: `${stats.biggest.range} m`, sub: `Day ${stats.biggest.d} · spring tide`, color: C.spring }),
-                React.createElement(Insight, { title: "Smallest range", value: `${stats.smallest.range} m`, sub: `Day ${stats.smallest.d} · neap tide`, color: C.muted })),
+                React.createElement(Insight, { title: "Highest high tide", value: `${cv(stats.topHigh.highH)} ${ul}`, sub: `Day ${stats.topHigh.d}, ${stats.topHigh.highT}`, color: C.high }),
+                React.createElement(Insight, { title: "Lowest low tide", value: `${cv(stats.lowLow.lowH)} ${ul}`, sub: `Day ${stats.lowLow.d}, ${stats.lowLow.lowT}`, color: C.low }),
+                React.createElement(Insight, { title: "Largest range", value: `${cv(stats.biggest.range)} ${ul}`, sub: `Day ${stats.biggest.d} · spring tide`, color: C.spring }),
+                React.createElement(Insight, { title: "Smallest range", value: `${cv(stats.smallest.range)} ${ul}`, sub: `Day ${stats.smallest.d} · neap tide`, color: C.muted })),
             React.createElement("div", { style: Object.assign(Object.assign({}, card), { padding: 16, marginTop: 12 }) },
                 React.createElement("h3", { style: { margin: "0 0 6px", fontSize: 14, fontWeight: 600 } }, "What's the pattern?"),
                 React.createElement("p", { style: { margin: 0, fontSize: 13.5, color: C.muted, lineHeight: 1.6 } },
@@ -415,25 +650,19 @@ function App() {
                         React.createElement("thead", null,
                             React.createElement("tr", { style: { color: C.muted, textAlign: "left" } },
                                 React.createElement("th", { style: th }, "Day"),
-                                React.createElement("th", { style: th }, "High tide"),
-                                React.createElement("th", { style: th }, "Height"),
-                                React.createElement("th", { style: th }, "Low tide"),
-                                React.createElement("th", { style: th }, "Height"),
+                                React.createElement("th", { style: th }, "High tides"),
+                                React.createElement("th", { style: th }, "Low tides"),
                                 React.createElement("th", { style: th }, "Range"))),
                         React.createElement("tbody", null, month.days.map((r) => (React.createElement("tr", { key: r.d, onClick: () => setDay(r.d), style: { cursor: "pointer", background: r.d === day ? "rgba(79,196,192,0.12)" : "transparent" } },
                             React.createElement("td", { style: td }, r.d),
-                            React.createElement("td", { style: td }, r.highT),
                             React.createElement("td", { style: Object.assign(Object.assign({}, td), { color: C.high, fontWeight: 600 }) },
-                                r.highH,
-                                " m"),
-                            React.createElement("td", { style: td }, r.lowT),
+                                r.highs.map((p) => p[0] + "  " + cv(p[1]) + ul).join("   /   ")),
                             React.createElement("td", { style: Object.assign(Object.assign({}, td), { color: C.low, fontWeight: 600 }) },
-                                r.lowH,
-                                " m"),
+                                r.lows.map((p) => p[0] + "  " + cv(p[1]) + ul).join("   /   ")),
                             React.createElement("td", { style: td },
-                                r.range,
-                                " m")))))))),
-            React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 18, textAlign: "center" } }, "DOF \u00B7 Georgetown (2290) \u00B7 heights in metres above chart datum \u00B7 Admiralty Tide Tables (daily extremes) \u00B7 British Crown Copyright \u00A9 2020")),
+                                cv(r.range),
+                                " " + ul)))))))),
+            React.createElement("div", { style: { fontSize: 11, color: C.faint, marginTop: 18, textAlign: "center" } }, `DOF \u00B7 Georgetown, Guyana \u00B7 heights in ${unit === "m" ? "metres" : "feet"} \u00B7 two high & two low tides per day \u00B7 source: tide-forecast.com / tidetime.org \u00B7 predictions, not for navigation`)),
         React.createElement("style", null, `
         @media (max-width: 720px) {
           .grid-main { grid-template-columns: 1fr !important; }
@@ -460,6 +689,14 @@ function navBtn(disabled) {
         opacity: disabled ? 0.5 : 1,
     };
 }
+function arrowBtn(disabled) {
+    return {
+        padding: "7px 11px", borderRadius: 8, fontSize: 13,
+        border: "1px solid " + C.edge, background: "transparent",
+        color: disabled ? C.faint : C.ink, cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.5 : 1,
+    };
+}
 function Insight({ title, value, sub, color }) {
     return (React.createElement("div", { style: { background: C.panel, border: `1px solid ${C.edge}`, borderRadius: 14, padding: 14, borderLeft: `3px solid ${color}` } },
         React.createElement("div", { style: { fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 1 } }, title),
@@ -468,6 +705,7 @@ function Insight({ title, value, sub, color }) {
 }
 const th = { padding: "8px 10px", borderBottom: `1px solid ${C.edge}`, fontWeight: 600 };
 const td = { padding: "8px 10px", borderBottom: `1px solid rgba(27,66,80,0.5)` };
+const dateInput = { background: C.abyss, color: C.ink, border: "1px solid " + C.edge, borderRadius: 8, padding: "6px 8px", fontSize: 12, colorScheme: "dark" };
 
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
   </script>
